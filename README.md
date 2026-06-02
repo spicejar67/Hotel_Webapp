@@ -16,19 +16,13 @@ bash setup.sh
 
 ### macOS
 
-Requires [Homebrew](https://brew.sh). Install it first if you don't have it:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-Then:
-
 ```bash
 git clone https://github.com/spicejar67/Hotel_Webapp.git
 cd Hotel_Webapp
 bash setup-mac.sh
 ```
+
+> Installs Homebrew automatically if you don't have it.
 
 ---
 
@@ -77,5 +71,5 @@ brew services stop nginx mariadb php     # Stop
 ## Requirements
 
 - **Linux:** Ubuntu 24.04+ / Debian 12+ / WSL2 Ubuntu
-- **macOS:** Homebrew + 2GB free disk
+- **macOS:** 2GB free disk
 - Internet connection (pulls WordPress + dependencies)

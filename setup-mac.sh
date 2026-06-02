@@ -16,11 +16,11 @@ NC='\033[0m'
 echo -e "${BLUE}  Hotel Metrodata - macOS Setup  ${NC}"
 echo "==================================="
 
-# Check for Homebrew
+# Auto-install Homebrew if missing
 if ! command -v brew &> /dev/null; then
-    echo -e "${RED}Homebrew not found. Install it first:${NC}"
-    echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-    exit 1
+    echo -e "${GREEN}Installing Homebrew...${NC}"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
+    eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
