@@ -4,13 +4,19 @@ A full-featured hotel reservation website built on WordPress + WooCommerce.
 
 ## One-Click Setup
 
+Clone and run inside WSL/Linux:
+
 ```bash
 git clone https://github.com/spicejar67/Hotel_Webapp.git
 cd Hotel_Webapp
 bash setup.sh
 ```
 
-That's it. The script installs everything automatically — nginx, PHP, MariaDB, WordPress, WooCommerce, all plugins, products, and content. When it finishes, open:
+The script auto-installs everything — nginx, PHP, MariaDB, WordPress, WooCommerce, all plugins, products, and content. No configuration needed.
+
+> **WSL users:** Clone directly inside WSL (not from `/mnt/c/`). The script auto-moves itself to `/var/www/` if you forget.
+
+When it finishes:
 
 - **Website:** http://localhost
 - **Admin panel:** http://localhost/wp-admin (username: `aus`, password: `admin123`)
@@ -19,17 +25,15 @@ That's it. The script installs everything automatically — nginx, PHP, MariaDB,
 ## Start / Stop
 
 ```bash
-bash start.sh    # Start the server
-bash stop.sh     # Stop the server
+bash start.sh    # Start nginx, MariaDB, PHP
+bash stop.sh     # Stop all services
 ```
-
-These start/stop nginx, MariaDB, and PHP — not needed right after setup (services are already running), but useful after rebooting.
 
 ## Features
 
-- Carousel homepage with 5 room listings
-- Room shop with add-to-cart and monthly pricing
-- 2FA email verification sign-up (Gmail SMTP)
+- Carousel homepage with room listings
+- Room shop with add-to-cart and `/month` pricing
+- Email verification sign-up (Gmail SMTP)
 - Cart, checkout (login required), payment history
 - Auto-logout after 5 minutes of inactivity
 - Star rating system for rooms
@@ -39,15 +43,14 @@ These start/stop nginx, MariaDB, and PHP — not needed right after setup (servi
 ## Admin Account
 
 | Field | Value |
-|-------|-------|
+|---|---|
 | Username | `aus` |
 | Password | `admin123` |
-| Email | (set by boss) |
 
 **Change the password after first login.**
 
 ## Requirements
 
-- Ubuntu 24.04+ / Debian 12+ / WSL2 with Ubuntu
-- Internet connection (for dependency installs)
-- 2GB+ free disk space
+- Ubuntu 24.04+ / Debian 12+ / WSL2 Ubuntu
+- Internet connection (pulls WordPress + dependencies)
+- 2GB+ disk space
