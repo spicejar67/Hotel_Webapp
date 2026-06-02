@@ -4,7 +4,7 @@ A full-featured hotel reservation website built on WordPress + WooCommerce.
 
 ## One-Click Setup
 
-Clone and run inside WSL/Linux:
+### Linux / WSL (Ubuntu/Debian)
 
 ```bash
 git clone https://github.com/spicejar67/Hotel_Webapp.git
@@ -12,9 +12,27 @@ cd Hotel_Webapp
 bash setup.sh
 ```
 
-The script auto-installs everything — nginx, PHP, MariaDB, WordPress, WooCommerce, all plugins, products, and content. No configuration needed.
+> **WSL users:** Clone inside WSL (not `/mnt/c/`). Script auto-moves to `/var/www/` if you forget.
 
-> **WSL users:** Clone directly inside WSL (not from `/mnt/c/`). The script auto-moves itself to `/var/www/` if you forget.
+### macOS
+
+Requires [Homebrew](https://brew.sh). Install it first if you don't have it:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Then:
+
+```bash
+git clone https://github.com/spicejar67/Hotel_Webapp.git
+cd Hotel_Webapp
+bash setup-mac.sh
+```
+
+---
+
+Both scripts auto-install everything — web server, PHP, database, WordPress, WooCommerce, plugins, products, content. No configuration needed.
 
 When it finishes:
 
@@ -24,9 +42,16 @@ When it finishes:
 
 ## Start / Stop
 
+### Linux/WSL
 ```bash
 bash start.sh    # Start nginx, MariaDB, PHP
 bash stop.sh     # Stop all services
+```
+
+### macOS
+```bash
+brew services start nginx mariadb php    # Start
+brew services stop nginx mariadb php     # Stop
 ```
 
 ## Features
@@ -51,6 +76,6 @@ bash stop.sh     # Stop all services
 
 ## Requirements
 
-- Ubuntu 24.04+ / Debian 12+ / WSL2 Ubuntu
+- **Linux:** Ubuntu 24.04+ / Debian 12+ / WSL2 Ubuntu
+- **macOS:** Homebrew + 2GB free disk
 - Internet connection (pulls WordPress + dependencies)
-- 2GB+ disk space
