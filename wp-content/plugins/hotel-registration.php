@@ -4,6 +4,14 @@ Plugin Name: Hotel Registration
 Description: Sign-up with email verification via direct SMTP
 */
 
+/**
+ * Send an email via direct SMTP (Gmail) using PHPMailer.
+ *
+ * @param string $to      Recipient email address.
+ * @param string $subject Email subject line.
+ * @param string $body    Plain-text email body.
+ * @return bool True on success, false on failure.
+ */
 function hotel_send_email($to, $subject, $body) {
     require_once ABSPATH . WPINC . "/PHPMailer/PHPMailer.php";
     require_once ABSPATH . WPINC . "/PHPMailer/SMTP.php";
@@ -11,6 +19,7 @@ function hotel_send_email($to, $subject, $body) {
     
     $mail = new PHPMailer\PHPMailer\PHPMailer(true);
     try {
+        // Configure Gmail SMTP
         $mail->isSMTP();
         $mail->Host = "smtp.gmail.com";
         $mail->Port = 587;
@@ -30,6 +39,12 @@ function hotel_send_email($to, $subject, $body) {
     }
 }
 
+/**
+ * Render the custom sign-up form on the WooCommerce login page.
+ * Collects email and password, then sends a verification code.
+ *
+ * @action woocommerce_before_customer_login_form
+ */
 add_action("woocommerce_before_customer_login_form", function() {
     if (isset($_GET["action"]) && $_GET["action"] === "verify") return;
     ?>
@@ -58,6 +73,13 @@ add_action("woocommerce_before_customer_login_form", function() {
     <?php
 });
 
+/**
+ * Process the sign-up form: validate input, generate a 6-digit
+ * verification code, store it in a custom DB table, send the code
+ * via email, then redirect to the verification form.
+ *
+ * @action init
+ */
 add_action("init", function() {
     if (!isset($_POST["hotel_signup"]) || !isset($_POST["signup_nonce"])) return;
     if (!wp_verify_nonce($_POST["signup_nonce"], "hotel_signup")) return;
@@ -69,6 +91,7 @@ add_action("init", function() {
     if (strlen($password) < 8) { wc_add_notice("Password must be at least 8 characters.", "error"); return; }
     if (email_exists($email)) { wc_add_notice("Account already exists. Please log in.", "error"); return; }
 
+    // Ensure the signup codes table exists
     global $wpdb; $table = $wpdb->prefix . "signup_codes";
     $wpdb->query("CREATE TABLE IF NOT EXISTS $table (
         id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255) NOT NULL,
@@ -80,6 +103,7 @@ add_action("init", function() {
     $code = str_pad(rand(0, 999999), 6, "0", STR_PAD_LEFT);
     $wpdb->insert($table, array("email" => $email, "code" => $code,
         "expires_at" => gmdate("Y-m-d H:i:s", strtotime("+10 minutes"))));
+    // Store password temporarily so it survives the redirect
     set_transient("signup_pw_" . md5($email), $password, 600);
 
     $sent = hotel_send_email($email, "Hotel Metrodata - Verification Code",
@@ -125,6 +149,13 @@ add_action("woocommerce_before_customer_login_form", function() {
     <?php
 });
 
+/**
+ * Process the verification code submission: check the code against
+ * the database, retrieve the password from the transient, create
+ * the user account, and auto-login.
+ *
+ * @action init
+ */
 add_action("init", function() {
     if (!isset($_POST["hotel_verify"]) || !isset($_POST["verify_nonce"])) return;
     if (!wp_verify_nonce($_POST["verify_nonce"], "hotel_verify")) return;
@@ -143,21 +174,28 @@ add_action("init", function() {
     if (!$password) { wc_add_notice("Session expired. Start over.", "error"); return; }
 
     $username = sanitize_user(current(explode("@", $email)), true);
-    if (username_exists($username)) $username .= rand(100, 999);
+    if (username_exists($username)) $username .= rand(100, 999); // Ensure uniqueness
 
     $uid = wp_insert_user(array("user_login" => $username, "user_email" => $email,
         "user_pass" => $password, "role" => "customer"));
     if (is_wp_error($uid)) { wc_add_notice("Error: " . $uid->get_error_message(), "error"); return; }
 
     $wpdb->update($table, array("verified" => 1), array("id" => $row->id));
-    delete_transient("signup_pw_" . md5($email));
+    delete_transient("signup_pw_" . md5($email)); // Clean up password transient
 
+    // Log the user in and redirect to My Account
     wp_set_current_user($uid); wp_set_auth_cookie($uid);
     wc_add_notice("Account created! Welcome to Hotel Metrodata.", "success");
     wp_safe_redirect(wc_get_page_permalink("myaccount"));
     exit;
 });
 
+/**
+ * Hide the default WooCommerce registration form on the account page
+ * since this plugin provides its own custom sign-up and verification UI.
+ *
+ * @action wp_head
+ */
 add_action("wp_head", function() {
     if (is_account_page()) echo "<style>.woocommerce-form-register{display:none!important}</style>";
 });

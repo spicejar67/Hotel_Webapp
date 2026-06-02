@@ -4,20 +4,35 @@ Plugin Name: Hotel Admin Panel
 Description: Admin UI for managing users, rooms, prices, images, and deletion
 */
 
-// Exclude Hotel Admin page (ID 51) from wp_list_pages
+/**
+ * Exclude the Hotel Admin page (ID 51) from wp_list_pages output
+ * so it doesn't appear in public page lists.
+ *
+ * @filter wp_list_pages_excludes
+ */
 add_filter("wp_list_pages_excludes", function($exclude) {
     $exclude[] = 51;
     return $exclude;
 });
 
-// Register blocked role
+/**
+ * Register the "blocked" custom role on init if it doesn't already exist.
+ * Users assigned this role cannot read any content.
+ *
+ * @action init
+ */
 add_action("init", function() {
     if (!get_role("blocked")) {
         add_role("blocked", "Blocked", array("read" => false));
     }
 });
 
-// Blocked users cannot log in
+/**
+ * Prevent users with the "blocked" role from authenticating.
+ * Returns a WP_Error if the user is blocked.
+ *
+ * @filter authenticate
+ */
 add_filter("authenticate", function($user, $username, $password) {
     if ($user instanceof WP_User && in_array("blocked", $user->roles)) {
         return new WP_Error("blocked", "Your account has been blocked.");
@@ -25,7 +40,12 @@ add_filter("authenticate", function($user, $username, $password) {
     return $user;
 }, 99, 3);
 
-// Auto-approve all product reviews
+/**
+ * Auto-approve all WooCommerce product reviews so they appear
+ * immediately without moderation.
+ *
+ * @filter pre_comment_approved
+ */
 add_filter("pre_comment_approved", function($approved, $commentdata) {
     if (isset($commentdata["comment_type"]) && $commentdata["comment_type"] === "review") {
         return 1;
@@ -33,7 +53,12 @@ add_filter("pre_comment_approved", function($approved, $commentdata) {
     return $approved;
 }, 99, 2);
 
-// Show rooms available count on product cards
+/**
+ * Display the rooms-available count below the product title
+ * in shop/archive loops.
+ *
+ * @action woocommerce_after_shop_loop_item_title
+ */
 add_action("woocommerce_after_shop_loop_item_title", function() {
     $available = get_post_meta(get_the_ID(), "_rooms_available", true);
     if ($available) {
@@ -43,7 +68,12 @@ add_action("woocommerce_after_shop_loop_item_title", function() {
 
 
 
-// Enqueue jQuery UI datepicker for calendar
+/**
+ * Enqueue jQuery UI datepicker CSS and JS on single product pages
+ * for the booking date selection widget.
+ *
+ * @action wp_enqueue_scripts
+ */
 add_action("wp_enqueue_scripts", function() {
     if (is_product()) {
         wp_enqueue_style("jquery-ui-css", "https://code.jquery.com/ui/1.14.1/themes/smoothness/jquery-ui.css", array(), "1.14.1");
@@ -51,7 +81,12 @@ add_action("wp_enqueue_scripts", function() {
     }
 }, 40);
 
-// Hidden date inputs inside add-to-cart form (synced from picker)
+/**
+ * Inject hidden check-in/check-out inputs into the add-to-cart form
+ * so chosen dates are submitted with the product.
+ *
+ * @action woocommerce_before_add_to_cart_button
+ */
 add_action("woocommerce_before_add_to_cart_button", function() {
     ?>
     <input type="hidden" id="booking-checkin-hidden" name="booking_checkin" value="">
@@ -59,7 +94,13 @@ add_action("woocommerce_before_add_to_cart_button", function() {
     <?php
 }, 1);
 
-// Date picker on single product page (left column, below map)
+/**
+ * Render the date-picker UI (two readonly text inputs with
+ * jQuery UI datepicker) below the product thumbnails on
+ * single product pages.
+ *
+ * @action woocommerce_product_thumbnails
+ */
 add_action("woocommerce_product_thumbnails", function() {
     ?>
     <div style="margin:12px 0 200px 0;padding:12px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;clear:both;">
@@ -79,7 +120,7 @@ add_action("woocommerce_product_thumbnails", function() {
     </div>
     <script>
     jQuery(function($) {
-        // Sync date picker values to hidden form inputs
+        // Sync date picker values to hidden form inputs before submit
         function syncDates() {
             $("#booking-checkin-hidden").val($("#booking-checkin").val());
             $("#booking-checkout-hidden").val($("#booking-checkout").val());
@@ -96,9 +137,11 @@ add_action("woocommerce_product_thumbnails", function() {
             changeYear: true,
             numberOfMonths: 1,
             onSelect: function(selectedDate) { syncDates();
+                // Set checkout minDate to one day after selected check-in
                 var nextDay = new Date(selectedDate);
                 nextDay.setDate(nextDay.getDate() + 1);
                 $("#booking-checkout").datepicker("option", "minDate", nextDay);
+                // Clear checkout if it falls before the new check-in
                 if ($("#booking-checkout").val() && $("#booking-checkout").datepicker("getDate") <= new Date(selectedDate)) {
                     $("#booking-checkout").val("");
                 }
@@ -116,7 +159,12 @@ add_action("woocommerce_product_thumbnails", function() {
     <?php
 }, 105);
 
-// Store dates in cart item data
+/**
+ * Attach check-in/check-out dates to cart item data when a product
+ * is added to the cart. A unique key prevents cart merging.
+ *
+ * @filter woocommerce_add_cart_item_data
+ */
 add_filter("woocommerce_add_cart_item_data", function($cart_item_data, $product_id) {
     if (isset($_POST["booking_checkin"]) && isset($_POST["booking_checkout"])) {
         $cart_item_data["booking_checkin"] = sanitize_text_field($_POST["booking_checkin"]);
@@ -126,14 +174,24 @@ add_filter("woocommerce_add_cart_item_data", function($cart_item_data, $product_
     return $cart_item_data;
 }, 10, 2);
 
-// Persist dates in cart session
+/**
+ * Restore booking dates from the cart session so they persist
+ * across page loads.
+ *
+ * @filter woocommerce_get_cart_item_from_session
+ */
 add_filter("woocommerce_get_cart_item_from_session", function($cart_item, $values) {
     if (isset($values["booking_checkin"])) $cart_item["booking_checkin"] = $values["booking_checkin"];
     if (isset($values["booking_checkout"])) $cart_item["booking_checkout"] = $values["booking_checkout"];
     return $cart_item;
 }, 10, 2);
 
-// Show dates on cart and checkout
+/**
+ * Display formatted check-in/check-out dates in the cart and
+ * checkout item meta.
+ *
+ * @filter woocommerce_get_item_data
+ */
 add_filter("woocommerce_get_item_data", function($item_data, $cart_item) {
     if (isset($cart_item["booking_checkin"])) {
         $item_data[] = array(
@@ -150,7 +208,12 @@ add_filter("woocommerce_get_item_data", function($item_data, $cart_item) {
     return $item_data;
 }, 10, 2);
 
-// Save dates to order items on checkout
+/**
+ * Persist booking dates as order line-item meta when the order
+ * is created during checkout.
+ *
+ * @action woocommerce_checkout_create_order_line_item
+ */
 add_action("woocommerce_checkout_create_order_line_item", function($item, $cart_item_key, $values, $order) {
     if (isset($values["booking_checkin"])) {
         $item->add_meta_data("Check-in", date("M j, Y", strtotime($values["booking_checkin"])), true);
@@ -160,7 +223,12 @@ add_action("woocommerce_checkout_create_order_line_item", function($item, $cart_
     }
 }, 10, 4);
 
-// Leaflet minimap on single product pages
+/**
+ * Enqueue Leaflet.js CSS and JS on single product pages
+ * for the interactive minimap.
+ *
+ * @action wp_enqueue_scripts
+ */
 add_action("wp_enqueue_scripts", function() {
     if (is_product()) {
         wp_enqueue_style("leaflet-css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", array(), "1.9.4");
@@ -168,6 +236,12 @@ add_action("wp_enqueue_scripts", function() {
     }
 }, 30);
 
+/**
+ * Render a Leaflet minimap on single product pages using
+ * the room's latitude/longitude meta fields.
+ *
+ * @action woocommerce_product_thumbnails
+ */
 add_action("woocommerce_product_thumbnails", function() {
     $lat = get_post_meta(get_the_ID(), "_room_lat", true);
     $lng = get_post_meta(get_the_ID(), "_room_lng", true);
@@ -185,7 +259,12 @@ add_action("woocommerce_product_thumbnails", function() {
     <?php
 }, 100);
 
-// Show rooms available count on single product pages
+/**
+ * Display rooms-available count in the single product summary
+ * area (larger, styled badge).
+ *
+ * @action woocommerce_single_product_summary
+ */
 add_action("woocommerce_single_product_summary", function() {
     $available = get_post_meta(get_the_ID(), "_rooms_available", true);
     if ($available) {
@@ -193,9 +272,18 @@ add_action("woocommerce_single_product_summary", function() {
     }
 }, 25);
 
-// Main admin panel shortcode [hotel_admin_panel]
+/**
+ * Hotel Admin Panel shortcode [hotel_admin_panel].
+ *
+ * Renders a full admin dashboard with tabs for Users, Rooms & Prices,
+ * Bookings calendar, and Add Room. Only accessible by user ID 1.
+ * Handles block/unblock, room CRUD, price updates, and image uploads.
+ *
+ * @return string HTML output of the admin panel.
+ */
 add_shortcode("hotel_admin_panel", "hotel_admin_panel_shortcode");
 function hotel_admin_panel_shortcode() {
+    // Restrict to admin (user ID 1)
     if (!is_user_logged_in() || get_current_user_id() != 1) {
         return "<p>Access denied. Admin only.</p>";
     }
@@ -203,17 +291,17 @@ function hotel_admin_panel_shortcode() {
     $nonce = wp_create_nonce("ha_nonce");
     ob_start();
 
-    // Handle block user
+    // Handle block user action
     if (isset($_GET["ha"]) && $_GET["ha"] === "block" && wp_verify_nonce($_GET["_n"], "ha_nonce")) {
         $uid = intval($_GET["uid"]);
-        if ($uid != 1) {
+        if ($uid != 1) { // Prevent self-blocking
             $u = new WP_User($uid);
             $u->set_role("blocked");
             echo '<div class="ha-notice ha-notice-success">User blocked.</div>';
         }
     }
 
-    // Handle unblock user
+    // Handle unblock user action
     if (isset($_GET["ha"]) && $_GET["ha"] === "unblock" && wp_verify_nonce($_GET["_n"], "ha_nonce")) {
         $uid = intval($_GET["uid"]);
         $u = new WP_User($uid);
@@ -221,7 +309,7 @@ function hotel_admin_panel_shortcode() {
         echo '<div class="ha-notice ha-notice-success">User unblocked.</div>';
     }
 
-    // Handle delete room
+    // Handle delete room action
     if (isset($_GET["ha"]) && $_GET["ha"] === "delete_room" && wp_verify_nonce($_GET["_n"], "ha_nonce")) {
         $pid = intval($_GET["pid"]);
         $pname = get_the_title($pid);
@@ -229,7 +317,7 @@ function hotel_admin_panel_shortcode() {
         echo '<div class="ha-notice ha-notice-warning">Room deleted: ' . esc_html($pname) . '</div>';
     }
 
-    // Handle update price
+    // Handle update price action (rooms tab quick-edit)
     if (isset($_POST["ha_action"]) && $_POST["ha_action"] === "update_price" && wp_verify_nonce($_POST["_n"], "ha_nonce")) {
         $pid = intval($_POST["pid"]);
         $price = floatval($_POST["price"]);
@@ -239,7 +327,7 @@ function hotel_admin_panel_shortcode() {
         echo '<div class="ha-notice ha-notice-success">Price updated to $' . number_format($price, 2) . '</div>';
     }
 
-    // Handle edit room (title, content, excerpt, price, thumbnail)
+    // Handle edit room action (full edit form submission)
     if (isset($_POST["ha_action"]) && $_POST["ha_action"] === "edit_room" && wp_verify_nonce($_POST["_n"], "ha_nonce")) {
         $pid = intval($_POST["pid"]);
         $name = sanitize_text_field($_POST["room_name"]);
@@ -253,9 +341,11 @@ function hotel_admin_panel_shortcode() {
             "post_content" => $desc,
             "post_excerpt" => $short,
         ));
+        // Sync WooCommerce price meta
         update_post_meta($pid, "_price", $price);
         update_post_meta($pid, "_regular_price", $price);
 
+        // Handle optional image upload
         if (!empty($_FILES["room_image"]["name"]) && $_FILES["room_image"]["error"] === 0) {
             $file = $_FILES["room_image"];
             $upload_dir = wp_upload_dir();
@@ -267,6 +357,7 @@ function hotel_admin_panel_shortcode() {
             $filename = sanitize_title($name) . "." . $ext;
             $filepath = $hotel_dir . $filename;
             if (move_uploaded_file($file["tmp_name"], $filepath)) {
+                // Create attachment and set as post thumbnail
                 $wp_filetype = wp_check_filetype($filename);
                 $attach_id = wp_insert_attachment(array(
                     "post_mime_type" => $wp_filetype["type"],
@@ -286,7 +377,7 @@ function hotel_admin_panel_shortcode() {
         echo '<div class="ha-notice ha-notice-success">Room updated: ' . esc_html($name) . '</div>';
     }
 
-    // Handle add room
+    // Handle add room action
     if (isset($_POST["ha_action"]) && $_POST["ha_action"] === "add_room" && wp_verify_nonce($_POST["_n"], "ha_nonce")) {
         $name = sanitize_text_field($_POST["room_name"]);
         $price = floatval($_POST["room_price"]);
@@ -302,6 +393,7 @@ function hotel_admin_panel_shortcode() {
         ));
 
         if ($pid && !is_wp_error($pid)) {
+            // Set product type and meta for a virtual WooCommerce product
             wp_set_object_terms($pid, "simple", "product_type");
             update_post_meta($pid, "_price", $price);
             update_post_meta($pid, "_regular_price", $price);
@@ -332,12 +424,12 @@ function hotel_admin_panel_shortcode() {
                         set_post_thumbnail($pid, $attach_id);
                     }
                 }
-            }
-
-            echo '<div class="ha-notice ha-notice-success">Room added: ' . esc_html($name) . ' ($' . number_format($price, 2) . '/month) <a href="' . esc_url(get_permalink($pid)) . '" style="color:#fff;text-decoration:underline;">View</a></div>';
         }
+
+        echo '<div class="ha-notice ha-notice-success">Room added: ' . esc_html($name) . ' ($' . number_format($price, 2) . '/month) <a href="' . esc_url(get_permalink($pid)) . '" style="color:#fff;text-decoration:underline;">View</a></div>';
     }
 
+    // Determine active tab (default "users")
     $tab = isset($_GET["ha_tab"]) ? sanitize_key($_GET["ha_tab"]) : "users";
     if (!in_array($tab, array("users", "rooms", "add", "bookings"), true)) {
         $tab = "users";
@@ -397,6 +489,7 @@ function hotel_admin_panel_shortcode() {
                 <?php
                 $roles = implode(", ", $u->roles);
                 $badge = in_array("blocked", $u->roles) ? "blocked" : (in_array("administrator", $u->roles) ? "admin" : "customer");
+                // Build secure action URLs with nonce
                 $block_url = add_query_arg(array("ha" => "block", "uid" => $u->ID, "_n" => $nonce));
                 $unblock_url = add_query_arg(array("ha" => "unblock", "uid" => $u->ID, "_n" => $nonce));
                 ?>
@@ -492,10 +585,12 @@ function hotel_admin_panel_shortcode() {
 
     // --- Bookings Calendar Tab ---
     elseif ($tab === "bookings"):
+        // Fetch recent orders and extract check-in/check-out ranges
         $orders = wc_get_orders(array("limit" => 100, "status" => array("processing", "completed")));
         $booking_ranges = array(); // array of {room, checkin_ts, checkout_ts, color}
         $room_colors = array();
         $all_rooms = wc_get_products(array("limit" => 50, "orderby" => "title", "order" => "ASC"));
+        // Assign a deterministic color to each room from a palette
         $color_palette = array("#1565C0","#2e7d32","#c62828","#6a1b9a","#e65100","#00695c","#283593","#4a148c","#b71c1c","#1b5e20","#0d47a1","#880e4f");
         $ci2 = 0;
         foreach ($all_rooms as $r2) {
@@ -520,6 +615,7 @@ function hotel_admin_panel_shortcode() {
 
         $bmonth = isset($_GET["ha_month"]) ? intval($_GET["ha_month"]) : intval(date("m"));
         $byear = isset($_GET["ha_year"]) ? intval($_GET["ha_year"]) : intval(date("Y"));
+        // Handle month overflow/underflow
         if ($bmonth < 1) { $bmonth = 12; $byear--; }
         if ($bmonth > 12) { $bmonth = 1; $byear++; }
         $first_day = strtotime("$byear-$bmonth-01");
@@ -646,7 +742,17 @@ function hotel_admin_panel_shortcode() {
     return ob_get_clean();
 }
 
-// Room listings shortcode [room_listings] with sort by price/name/rating, toggle ASC/DESC
+/**
+ * Room listings shortcode [room_listings].
+ *
+ * Renders a filterable, sortable grid of room products with a sidebar
+ * containing property type, star rating, facilities, room features,
+ * meals, and policies filters. Supports sorting by price, title, or
+ * rating (ASC/DESC toggle). A price-range slider is also available.
+ *
+ * @param array $atts Shortcode attributes (unused).
+ * @return string HTML output.
+ */
 add_shortcode("room_listings", "room_listings_shortcode");
 function room_listings_shortcode($atts) {
     $sort = isset($_GET["sort"]) ? sanitize_text_field($_GET["sort"]) : "price";
@@ -667,6 +773,7 @@ function room_listings_shortcode($atts) {
 
     // Handle max_price separately (not from room meta)
     $max_price = isset($_GET["max_price"]) ? floatval($_GET["max_price"]) : 0;
+    // Calculate the global max price across all products for the slider
     $global_max_price = 0;
     foreach ($all_products as $prod) {
         $p = floatval(get_post_meta($prod->ID, "_price", true));
@@ -710,7 +817,7 @@ function room_listings_shortcode($atts) {
                 $stars = max(1, floor($avg)); // A rating of 0 still counts as 1 star
                 if ("s" . $stars !== $fv) { $match = false; break; }
             } elseif (isset($room_filters[$fk]) && $room_filters[$fk] === $fv) {
-                // meta match
+                // Meta match — continue
             } else {
                 $match = false; break;
             }
@@ -886,7 +993,16 @@ function room_listings_shortcode($atts) {
     return ob_get_clean();
 }
 
-// Room search autocomplete AJAX endpoint
+/**
+ * AJAX handler for room-search autocomplete.
+ *
+ * Accepts a "q" GET parameter, queries products by title, and returns
+ * JSON array of {title, url, price} for matching rooms. Accessed by
+ * both authenticated and guest users.
+ *
+ * @action wp_ajax_room_search
+ * @action wp_ajax_nopriv_room_search
+ */
 add_action("wp_ajax_room_search", "room_search_ajax");
 add_action("wp_ajax_nopriv_room_search", "room_search_ajax");
 function room_search_ajax() {
@@ -923,7 +1039,12 @@ function room_search_ajax() {
     wp_send_json($results);
 }
 
-// Add Admin Panel to nav menu (visible only for user ID 1)
+/**
+ * Append an "Admin Panel" link to the primary nav menu,
+ * visible only when logged in as user ID 1.
+ *
+ * @filter wp_nav_menu_items
+ */
 add_filter("wp_nav_menu_items", function($items, $args) {
     if (is_user_logged_in() && get_current_user_id() == 1) {
         $items .= '<li class="menu-item"><a href="' . esc_url(home_url("/hotel-admin/")) . '">Admin Panel</a></li>';
@@ -931,7 +1052,12 @@ add_filter("wp_nav_menu_items", function($items, $args) {
     return $items;
 }, 10, 2);
 
-// Add Admin Panel to page list (visible only for user ID 1)
+/**
+ * Append an "Admin Panel" link to wp_list_pages output,
+ * visible only when logged in as user ID 1.
+ *
+ * @filter wp_list_pages
+ */
 add_filter("wp_list_pages", function($output) {
     if (is_user_logged_in() && get_current_user_id() == 1) {
         $output .= '<li class="page_item"><a href="' . esc_url(home_url("/hotel-admin/")) . '">Admin Panel</a></li>';
@@ -939,7 +1065,13 @@ add_filter("wp_list_pages", function($output) {
     return $output;
 });
 
-// Enqueue autocomplete CSS + JS at priority 20
+/**
+ * Enqueue the room-search autocomplete script and styles.
+ * Localizes the admin-ajax URL for the JavaScript component and
+ * injects compact-header-layout CSS.
+ *
+ * @action wp_enqueue_scripts
+ */
 add_action("wp_enqueue_scripts", function() {
     wp_enqueue_script("jquery");
 
@@ -957,7 +1089,7 @@ jQuery(document).ready(function($) {
     var timer, selectedIndex = -1;
 
     function hideDropdown() { $dd.hide(); selectedIndex = -1; }
-    function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+    function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); } // Escape regex special chars
 
     $search.on("keyup", function(e) {
         if (e.key === "Escape" || e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") return;
@@ -970,6 +1102,7 @@ jQuery(document).ready(function($) {
                 selectedIndex = -1;
                 var html = "";
                 $.each(data, function(i, item) {
+                    // Highlight matching portion of the title
                     var title = $("<span>").text(item.title).html();
                     var regex = new RegExp("(" + escapeRegex(q) + ")", "gi");
                     title = title.replace(regex, '<strong class="room-search-match">$1</strong>');
@@ -1005,7 +1138,7 @@ jQuery(document).ready(function($) {
     });
 
     $(document).on("click", function(e) {
-        if (!$(e.target).closest(".site-search").length) hideDropdown();
+        if (!$(e.target).closest(".site-search").length) hideDropdown(); // Close when clicking outside
     });
 });
 JS;
@@ -1063,8 +1196,12 @@ JS;
 ');
 }, 20);
 
-
-// Add retro games to footer fun section
+/**
+ * Add retro game links (Tetris, Cart Catcher) to the Storefront
+ * footer area.
+ *
+ * @action storefront_footer
+ */
 add_action("storefront_footer", function() {
     echo '<div style="text-align:center;padding:10px;font-size:14px;color:#fff;">';
     echo '<a href="/tetris/" style="color:#0ff;text-decoration:none;margin:0 10px;font-weight:bold;">&#127918; Tetris</a>';
@@ -1072,13 +1209,20 @@ add_action("storefront_footer", function() {
     echo '</div>';
 }, 30);
 
-
-// Auto logout after 15 minutes of inactivity
+/**
+ * Auto-logout after 15 minutes of inactivity.
+ *
+ * Injects a modal countdown warning (appears 60s before timeout)
+ * and a JavaScript idle timer. Clicking "Stay Logged In" resets
+ * the timer; otherwise the user is redirected to the logout URL.
+ *
+ * @action wp_footer
+ */
 add_action("wp_footer", function() {
     if (!is_user_logged_in()) return;
     $logout_url = wp_logout_url(home_url());
-    $timeout = 900;
-    $warn_at = 840;
+    $timeout = 900; // 15 minutes total
+    $warn_at = 840; // Warn at 14 minutes
     ?>
     <div id="inactivity-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center;">
         <div style="background:#fff;padding:30px 40px;border-radius:8px;text-align:center;max-width:400px;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
@@ -1136,8 +1280,16 @@ add_action("wp_footer", function() {
     <?php
 });
 
-
-// Gemini AI Chatbot
+/**
+ * AJAX handler for the Groq-powered AI chatbot (AUS Assistant).
+ *
+ * Accepts a user message via POST, constructs a system prompt with
+ * site context and product listings, calls the Groq API (Llama model),
+ * and returns the assistant's reply.
+ *
+ * @action wp_ajax_aus_chat
+ * @action wp_ajax_nopriv_aus_chat
+ */
 add_action("wp_ajax_aus_chat", "aus_chat_ajax");
 add_action("wp_ajax_nopriv_aus_chat", "aus_chat_ajax");
 function aus_chat_ajax() {
@@ -1161,6 +1313,7 @@ function aus_chat_ajax() {
         $context .= $p->get_name() . " - $" . $p->get_price() . "/mo\n";
     }
 
+    // Build Groq API request payload
     $body = json_encode(array(
         "model" => "llama-3.1-8b-instant",
         "messages" => array(
@@ -1204,7 +1357,14 @@ function aus_chat_ajax() {
     wp_send_json_success(array("reply" => $text));
 }
 
-// Chat widget on homepage
+/**
+ * Render the AUS Assistant chat widget on the homepage.
+ *
+ * Adds a fixed-position chat bubble button in the bottom-right corner
+ * that expands into a chat interface powered by the Groq API.
+ *
+ * @action wp_footer
+ */
 add_action("wp_footer", function() {
     if (!is_front_page()) return;
     ?>

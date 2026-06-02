@@ -4,7 +4,13 @@ Plugin Name: Hotel Registration
 Description: Simple sign-up with immediate account creation
 */
 
-// Registration form
+/**
+ * Output a custom sign-up form inline on the WooCommerce login page.
+ * Replaces the default registration flow with immediate account creation
+ * (no email verification step).
+ *
+ * @action woocommerce_before_customer_login_form
+ */
 add_action("woocommerce_before_customer_login_form", function() {
     ?>
     <div class="hotel-signup-section" style="margin-top:40px;padding:30px;background:#f8f9fa;border-radius:8px;">
@@ -32,7 +38,13 @@ add_action("woocommerce_before_customer_login_form", function() {
     <?php
 });
 
-// Handle signup - create account immediately
+/**
+ * Process the custom sign-up form submission.
+ * Validates input, creates a WordPress user account immediately,
+ * logs them in, and redirects to My Account.
+ *
+ * @action init
+ */
 add_action("init", function() {
     if (!isset($_POST["hotel_signup"]) || !isset($_POST["signup_nonce"])) return;
     if (!wp_verify_nonce($_POST["signup_nonce"], "hotel_signup")) return;
@@ -40,10 +52,12 @@ add_action("init", function() {
     $email = sanitize_email($_POST["signup_email"]);
     $password = $_POST["signup_password"];
 
+    // Validate email and password
     if (!is_email($email)) { wc_add_notice("Invalid email.", "error"); return; }
     if (strlen($password) < 8) { wc_add_notice("Password must be at least 8 characters.", "error"); return; }
     if (email_exists($email)) { wc_add_notice("An account with this email already exists. Please log in.", "error"); return; }
 
+    // Generate username from email prefix, append random digits if taken
     $username = sanitize_user(current(explode("@", $email)), true);
     if (username_exists($username)) $username .= rand(100, 999);
 
@@ -59,6 +73,7 @@ add_action("init", function() {
         return;
     }
 
+    // Auto-login the new user
     wp_set_current_user($user_id);
     wp_set_auth_cookie($user_id);
     wc_add_notice("Account created! Welcome to Hotel Metrodata.", "success");
@@ -66,7 +81,12 @@ add_action("init", function() {
     exit;
 });
 
-// Hide default WooCommerce registration
+/**
+ * Hide the default WooCommerce registration form on the My Account page
+ * since this plugin provides its own custom sign-up UI.
+ *
+ * @action wp_head
+ */
 add_action("wp_head", function() {
     if (is_account_page()) echo "<style>.woocommerce-form-register{display:none!important}</style>";
 });

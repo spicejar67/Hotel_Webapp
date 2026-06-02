@@ -4,15 +4,23 @@ Plugin Name: Hotel Payment History
 Description: Adds payment/order history tab to My Account
 */
 
-// Rename Orders to Payment History
+/**
+ * Rename "Orders" tab to "Payment History" in My Account menu
+ * and remove the Downloads tab (unused by hotel).
+ *
+ * @filter woocommerce_account_menu_items
+ */
 add_filter("woocommerce_account_menu_items", function($items) {
     $items["orders"] = "Payment History";
-    // Remove downloads (not needed for hotel)
-    unset($items["downloads"]);
+    unset($items["downloads"]); // Not needed for hotel rooms
     return $items;
 });
 
-// Add payment status badges
+/**
+ * Display color-coded payment status badges in the order history table.
+ *
+ * @action woocommerce_my_account_my_orders_column_order-status
+ */
 add_action("woocommerce_my_account_my_orders_column_order-status", function($order) {
     $status = $order->get_status();
     $badges = [
@@ -27,12 +35,18 @@ add_action("woocommerce_my_account_my_orders_column_order-status", function($ord
     echo "<span style=\"display:inline-block;padding:3px 10px;background:{$b[0]};color:#fff;border-radius:4px;font-size:11px;\">{$b[1]}</span>";
 });
 
-// Add total paid summary at top of payment history
+/**
+ * Show a summary banner above the Payment History table with the
+ * count and total dollar amount of completed/processing orders.
+ *
+ * @action woocommerce_before_account_orders
+ */
 add_action("woocommerce_before_account_orders", function($has_orders) {
     if (!$has_orders) return;
     $customer_orders = wc_get_orders(array("customer_id" => get_current_user_id(), "limit" => -1));
     $total = 0; $count = 0;
     foreach ($customer_orders as $o) {
+        // Only count orders that have been paid or are being processed
         if (in_array($o->get_status(), ["completed", "processing"])) {
             $total += $o->get_total();
             $count++;

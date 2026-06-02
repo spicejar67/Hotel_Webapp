@@ -1,5 +1,10 @@
 <?php
-// Add tetris link to footer widgets
+/**
+ * Append a "Fun" widget block to the Storefront footer area
+ * containing a link to the Tetris game page.
+ *
+ * @action storefront_footer
+ */
 add_action("storefront_footer", function() {
     echo "<div class=\"block footer-widget col-1\">";
     echo "<h2 style=\"color:#333;font-size:14px;margin-bottom:5px;\">Fun</h2>";
