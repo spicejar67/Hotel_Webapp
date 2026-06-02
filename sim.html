@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voting Sim Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:10px;font-family:Arial,sans-serif;color:#ccc;overflow-x:hidden;}
+h1{font-size:22px;margin-bottom:8px;color:#e0e0e0;}
+#layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
+canvas{background:#0d0d1a;border:1px solid #333;border-radius:4px;cursor:crosshair;}
+#sidebar{width:320px;display:flex;flex-direction:column;gap:6px;}
+#sidebar label{font-size:12px;color:#aaa;margin-top:2px;}
+#sidebar select,#sidebar input{padding:7px;background:#222;color:#ccc;border:1px solid #444;border-radius:3px;font-size:13px;width:100%;}
+#approval-group{display:none;}
+#cluster-group{display:none;}
+#approval-group .row,#cluster-group .row{display:flex;align-items:center;gap:8px;}
+#approval-group input[type=range],#cluster-group input[type=range]{flex:1;}
+#approval-group span,#cluster-group span{font-size:11px;color:#888;min-width:35px;}
+#controls{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+button{padding:8px 14px;background:#333;color:#ccc;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:12px;user-select:none;}
+button:hover{background:#444;color:#fff;}
+button.active{background:#4fc3f7;color:#000;border-color:#4fc3f7;}
+#btn-vote{background:#2e7d32;border-color:#4caf50;}
+#btn-vote:hover{background:#388e3c;}
+#btn-clear{background:#b71c1c;border-color:#ef5350;}
+#btn-clear:hover{background:#c62828;}
+#stats{font-size:12px;color:#999;}
+#tally{display:flex;flex-direction:column;gap:3px;font-size:12px;}
+.tally-row{display:flex;align-items:center;gap:6px;padding:3px 8px;background:#222;border-radius:3px;}
+.tally-row .sw{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.tally-row .bar-wrap{flex:1;height:8px;background:#111;border-radius:4px;overflow:hidden;}
+.tally-row .bar{height:100%;border-radius:4px;transition:width 0.3s;}
+#history{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;background:#0d0d1a;border:1px solid #222;border-radius:4px;padding:6px;}
+#history::-webkit-scrollbar{width:4px;}
+#history::-webkit-scrollbar-thumb{background:#444;border-radius:2px;}
+.hist-entry{font-size:11px;padding:5px 8px;background:#14141f;border-radius:3px;}
+.hist-entry .win{font-weight:bold;color:#ff0;}
+.hist-entry .sys{color:#888;}
+.hist-entry .pcts{color:#777;margin-top:2px;}
+#debug{font-size:10px;color:#4fc3f7;margin-top:2px;min-height:16px;}
+</style>
+</head>
+<body>
+<h1>Voting Sim &mdash; Step 3: Systems &amp; History</h1>
+<div id="layout">
+  <canvas id="board"></canvas>
+  <div id="sidebar">
+    <label>Voting System</label>
+    <select id="voting-system">
+      <option value="plurality">Plurality</option>
+      <option value="irv">Instant Runoff (IRV)</option>
+      <option value="approval">Approval</option>
+    </select>
+    <div id="approval-group">
+      <label>Approval Radius (px)</label>
+      <div class="row">
+        <input type="range" id="approval-radius" value="120" min="30" max="400" step="5">
+        <span id="radius-val">120</span>
+      </div>
+    </div>
+    <div id="cluster-group">
+      <label>Cluster Radius (px)</label>
+      <div class="row">
+        <input type="range" id="cluster-radius" value="60" min="10" max="300" step="5">
+        <span id="cluster-val">60</span>
+      </div>
+    </div>
+    <div id="stats">Candidates: 0 &nbsp;|&nbsp; Voters: 0</div>
+    <div id="controls">
+      <button id="btn-candidate">Place Candidate</button>
+      <button id="btn-voter">Add Cluster (50)</button>
+      <button id="btn-random">Random 200</button>
+      <button id="btn-vote">Vote!</button>
+      <button id="btn-clear">Clear</button>
+    </div>
+    <div id="tally"></div>
+    <div id="debug"></div>
+    <label style="margin-top:2px;">Election History</label>
+    <div id="history"><span style="color:#555;">No elections yet</span></div>
+  </div>
+</div>
+<script>
+(function(){
+var canvas = document.getElementById('board');
+var ctx = canvas.getContext('2d');
+var W = 1000, H = 750, PAD = 70;
+canvas.width = W;
+canvas.height = H;
+
+var mode = null;
+var candidates = [];
+var voters = [];
+var history = [];
+var eliminated = {};
+var NC = function(){ return candidates.length; };
+
+var COLORS = ['#4fc3f7','#ef5350','#66bb6a','#ffa726','#ab47bc','#26c6da','#ec407a','#8d6e63'];
+var CNAMES  = ['Blue','Red','Green','Orange','Purple','Cyan','Pink','Brown'];
+
+function drawBoard() {
+  ctx.clearRect(0, 0, W, H);
+  var cx = W / 2, cy = H / 2;
+
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
+  ctx.setLineDash([10,5]);
+  ctx.beginPath(); ctx.moveTo(PAD,cy); ctx.lineTo(W-PAD,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,PAD); ctx.lineTo(cx,H-PAD); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#666';
+  ctx.beginPath(); ctx.moveTo(W-PAD,cy); ctx.lineTo(W-PAD-16,cy-8); ctx.lineTo(W-PAD-16,cy+8); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(PAD,cy); ctx.lineTo(PAD+16,cy-8); ctx.lineTo(PAD+16,cy+8); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx,H-PAD); ctx.lineTo(cx-8,H-PAD-16); ctx.lineTo(cx+8,H-PAD-16); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx,PAD); ctx.lineTo(cx-8,PAD+16); ctx.lineTo(cx+8,PAD+16); ctx.fill();
+
+  ctx.fillStyle = '#888'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('Apple',PAD+40,cy-14); ctx.fillText('Mango',W-PAD-40,cy-14);
+  ctx.fillText('Gado Gado',cx,PAD-10); ctx.fillText('Ketoprak',cx,H-PAD+26);
+  ctx.textAlign = 'start';
+
+  var sys = document.getElementById('voting-system').value;
+  if (sys==='approval') {
+    var rad = parseInt(document.getElementById('approval-radius').value)||120;
+    for (var i=0;i<NC();i++) {
+      ctx.beginPath(); ctx.arc(candidates[i].x,candidates[i].y,rad,0,Math.PI*2);
+      ctx.strokeStyle=COLORS[i%COLORS.length]+'33'; ctx.lineWidth=1; ctx.stroke();
+    }
+  }
+
+  for (var i=0;i<NC();i++) {
+    var c=candidates[i], elim=eliminated[i];
+    ctx.beginPath(); ctx.arc(c.x,c.y,14,0,Math.PI*2);
+    ctx.fillStyle=elim?'#333':COLORS[i%COLORS.length]; ctx.fill();
+    ctx.strokeStyle=elim?'#555':'#fff'; ctx.lineWidth=2; ctx.stroke();
+    if (elim) {
+      ctx.fillStyle='#f00'; ctx.font='bold 12px Arial';
+      ctx.fillText('ELIMINATED',c.x+18,c.y+5);
+    } else {
+      ctx.fillStyle='#fff'; ctx.font='12px Arial';
+      ctx.fillText(CNAMES[i%CNAMES.length],c.x+18,c.y+5);
+    }
+  }
+
+  for (var i=0;i<voters.length;i++) {
+    var v=voters[i];
+    ctx.beginPath(); ctx.arc(v.x,v.y,4,0,Math.PI*2);
+    ctx.fillStyle=v.color||'#ccc';
+    ctx.fill();
+  }
+
+  if (mode==='candidate') {
+    ctx.fillStyle='rgba(79,195,247,0.12)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#4fc3f7'; ctx.font='16px Arial'; ctx.textAlign='center';
+    ctx.fillText('Click to place candidate',W/2,H-20); ctx.textAlign='start';
+  } else if (mode==='voter') {
+    var clr = parseInt(document.getElementById('cluster-radius').value)||60;
+    ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ccc'; ctx.font='16px Arial'; ctx.textAlign='center';
+    ctx.fillText('Click to add 50 voters in cluster (radius '+clr+'px)',W/2,H-20); ctx.textAlign='start';
+  }
+
+  document.getElementById('stats').textContent='Candidates: '+NC()+'  |  Voters: '+voters.length;
+}
+
+function spawnCluster(cx,cy) {
+  var rad = parseInt(document.getElementById('cluster-radius').value)||60;
+  for (var i=0;i<50;i++) {
+    var angle = Math.random()*Math.PI*2;
+    var dist = Math.sqrt(Math.random())*rad;
+    var x = cx + Math.cos(angle)*dist;
+    var y = cy + Math.sin(angle)*dist;
+    voters.push({x:x,y:y,color:'#ccc'});
+  }
+}
+
+function closest(voter) {
+  var best=0,bestD=Infinity;
+  for (var i=0;i<NC();i++) {
+    var dx=voter.x-candidates[i].x,dy=voter.y-candidates[i].y,d=Math.sqrt(dx*dx+dy*dy);
+    if (d<bestD){bestD=d;best=i;}
+  }
+  return best;
+}
+
+function closestAmong(voter,indices) {
+  var best=indices[0],bestD=Infinity;
+  for (var i=0;i<indices.length;i++) {
+    var ci=indices[i],dx=voter.x-candidates[ci].x,dy=voter.y-candidates[ci].y,d=Math.sqrt(dx*dx+dy*dy);
+    if (d<bestD){bestD=d;best=ci;}
+  }
+  return best;
+}
+
+function allIdx(){var a=[];for(var i=0;i<NC();i++)a.push(i);return a;}
+
+function runPlurality() {
+  var idx=allIdx(),tally={};
+  for (var i=0;i<NC();i++)tally[i]=0;
+  for (var v=0;v<voters.length;v++)tally[closestAmong(voters[v],idx)]++;
+  for (var v=0;v<voters.length;v++)voters[v].color=COLORS[closestAmong(voters[v],idx)%COLORS.length];
+  var w=0,mx=0;
+  for (var i=0;i<NC();i++){if(tally[i]>mx){mx=tally[i];w=i;}}
+  return {winner:w,tally:tally,system:'Plurality'};
+}
+
+function runIRV() {
+  eliminated={}; var total=voters.length;
+  var remaining=[];
+  for (var i=0;i<NC();i++)remaining.push(i);
+
+  while (remaining.length>1) {
+    var tally={};
+    for (var r=0;r<remaining.length;r++)tally[remaining[r]]=0;
+    for (var v=0;v<voters.length;v++)tally[closestAmong(voters[v],remaining)]++;
+
+    var maxV=0,maxI=remaining[0],minV=Infinity,minI=remaining[0];
+    for (var r=0;r<remaining.length;r++) {
+      var c=remaining[r];
+      if (tally[c]>maxV){maxV=tally[c];maxI=c;}
+      if (tally[c]<minV){minV=tally[c];minI=c;}
+    }
+
+    if (maxV>total/2) {
+      for (var v=0;v<voters.length;v++)voters[v].color=COLORS[closestAmong(voters[v],remaining)%COLORS.length];
+      var fullTally={};
+      for (var i=0;i<NC();i++)fullTally[i]=tally[i]||0;
+      return {winner:maxI,tally:fullTally,system:'IRV',eliminated:eliminated};
+    }
+
+    eliminated[minI]=true;
+    var next=[];
+    for (var r=0;r<remaining.length;r++){if(remaining[r]!==minI)next.push(remaining[r]);}
+    remaining=next;
+  }
+
+  var ft={};for(var i=0;i<NC();i++)ft[i]=0;ft[remaining[0]]=total;
+  for (var v=0;v<voters.length;v++)voters[v].color=COLORS[remaining[0]%COLORS.length];
+  return {winner:remaining[0],tally:ft,system:'IRV',eliminated:eliminated};
+}
+
+function runApproval() {
+  eliminated={};
+  var rad=parseInt(document.getElementById('approval-radius').value)||120;
+  var tally={};for(var i=0;i<NC();i++)tally[i]=0;
+  var multiVoters=0;
+
+  for (var v=0;v<voters.length;v++) {
+    var approved=[];
+    for (var c=0;c<NC();c++) {
+      var dx=voters[v].x-candidates[c].x,dy=voters[v].y-candidates[c].y;
+      if (Math.sqrt(dx*dx+dy*dy)<=rad)approved.push(c);
+    }
+    if (approved.length>0) {
+      if (approved.length>1)multiVoters++;
+      for (var a=0;a<approved.length;a++)tally[approved[a]]++;
+      voters[v].color=COLORS[approved[0]%COLORS.length];
+    } else {
+      voters[v].color='#444';
+    }
+  }
+
+  var w=0,mx=0;
+  for (var i=0;i<NC();i++){if(tally[i]>mx){mx=tally[i];w=i;}}
+  return {winner:w,tally:tally,system:'Approval',multiVoters:multiVoters};
+}
+
+function runVote() {
+  if (NC()===0||voters.length===0)return;
+  eliminated={};
+  var sys=document.getElementById('voting-system').value;
+  var result;
+  if (sys==='irv')result=runIRV();
+  else if (sys==='approval')result=runApproval();
+  else result=runPlurality();
+
+  var entry={
+    election:history.length+1,
+    system:result.system,
+    winner:result.winner,
+    tally:{},
+    voterCount:voters.length
+  };
+  for (var i=0;i<NC();i++)entry.tally[i]=result.tally[i]||0;
+  history.push(entry);
+
+  renderTally(result);
+  renderHistory();
+  drawBoard();
+}
+
+function renderTally(result) {
+  var h='',total=voters.length;
+  for (var i=0;i<NC();i++) {
+    var n=result.tally[i]||0,pct=total>0?Math.round(n/total*100):0;
+    var win=i===result.winner,elim=eliminated[i];
+    h+='<div class="tally-row">';
+    h+='<div class="sw" style="background:'+COLORS[i%COLORS.length]+';opacity:'+(elim?'0.3':'1')+'"></div>';
+    h+='<span style="width:55px;'+(win?'color:#ff0;font-weight:bold':'')+'">'+CNAMES[i%CNAMES.length]+(elim?' X':'')+'</span>';
+    h+='<span style="color:#ccc;width:50px;text-align:right;">'+n+' ('+pct+'%)</span>';
+    h+='<div class="bar-wrap"><div class="bar" style="width:'+pct+'%;background:'+COLORS[i%COLORS.length]+';opacity:'+(win?'1':'0.4')+'"></div></div>';
+    h+='</div>';
+  }
+  document.getElementById('tally').innerHTML=h;
+
+  var dbg='';
+  if (result.system==='Approval'&&result.multiVoters!==undefined) {
+    dbg='Approval: '+result.multiVoters+' voters approved multiple candidates';
+  } else if (result.system==='IRV') {
+    var elimCount=0;
+    for (var k in eliminated){if(eliminated[k])elimCount++;}
+    if (elimCount>0)dbg='IRV: '+elimCount+' candidate(s) eliminated (marked with red X)';
+  }
+  document.getElementById('debug').textContent=dbg;
+}
+
+function renderHistory() {
+  if (history.length===0){document.getElementById('history').innerHTML='<span style="color:#555;">No elections yet</span>';return;}
+  var h='';
+  for (var i=history.length-1;i>=0;i--) {
+    var e=history[i],wn=CNAMES[e.winner%CNAMES.length];
+    var ps='';
+    for (var j=0;j<NC();j++) {
+      var pct=e.voterCount>0?Math.round((e.tally[j]||0)/e.voterCount*100):0;
+      ps+='<span style="color:'+COLORS[j%COLORS.length]+'">'+pct+'%</span> ';
+    }
+    h+='<div class="hist-entry">';
+    h+='<b>#'+e.election+'</b> <span class="sys">['+e.system+']</span> ';
+    h+='<span class="win">'+wn+'</span> <span style="color:#888">('+e.voterCount+' voters)</span>';
+    h+='<div class="pcts">'+ps+'</div></div>';
+  }
+  document.getElementById('history').innerHTML=h;
+}
+
+function clearAll() {
+  candidates=[]; voters=[]; history=[]; eliminated={};
+  document.getElementById('tally').innerHTML='';
+  document.getElementById('history').innerHTML='<span style="color:#555;">No elections yet</span>';
+  document.getElementById('debug').textContent='';
+  drawBoard();
+}
+
+canvas.addEventListener('mousedown',function(e){
+  var rect=canvas.getBoundingClientRect();
+  var sx=W/rect.width,sy=H/rect.height;
+  var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy;
+  if (mode==='candidate'){candidates.push({x:x,y:y});drawBoard();}
+  else if (mode==='voter'){spawnCluster(x,y);drawBoard();}
+});
+
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  var rect=canvas.getBoundingClientRect();
+  var sx=W/rect.width,sy=H/rect.height;
+  var t=e.touches[0];
+  var x=(t.clientX-rect.left)*sx,y=(t.clientY-rect.top)*sy;
+  if (mode==='candidate'){candidates.push({x:x,y:y});drawBoard();}
+  else if (mode==='voter'){spawnCluster(x,y);drawBoard();}
+},{passive:false});
+
+document.getElementById('btn-candidate').addEventListener('click',function(){
+  if (mode==='candidate'){mode=null;this.classList.remove('active');}
+  else {mode='candidate';this.classList.add('active');document.getElementById('btn-voter').classList.remove('active');}
+  document.getElementById('cluster-group').style.display='none';
+  drawBoard();
+});
+
+document.getElementById('btn-voter').addEventListener('click',function(){
+  if (mode==='voter'){mode=null;this.classList.remove('active');}
+  else {mode='voter';this.classList.add('active');document.getElementById('btn-candidate').classList.remove('active');}
+  document.getElementById('cluster-group').style.display=mode==='voter'?'block':'none';
+  drawBoard();
+});
+
+document.getElementById('btn-random').addEventListener('click',function(){
+  for (var i=0;i<200;i++)voters.push({x:Math.random()*W,y:Math.random()*H,color:'#ccc'});
+  drawBoard();
+});
+
+document.getElementById('btn-vote').addEventListener('click',function(){
+  runVote();
+});
+
+document.getElementById('btn-clear').addEventListener('click',clearAll);
+
+document.getElementById('voting-system').addEventListener('change',function(){
+  document.getElementById('approval-group').style.display=this.value==='approval'?'block':'none';
+  eliminated={};
+  drawBoard();
+});
+
+document.getElementById('approval-radius').addEventListener('input',function(){
+  document.getElementById('radius-val').textContent=this.value;
+  drawBoard();
+});
+
+document.getElementById('cluster-radius').addEventListener('input',function(){
+  document.getElementById('cluster-val').textContent=this.value;
+  drawBoard();
+});
+
+drawBoard();
+})();
+</script>
+</body>
+</html>
