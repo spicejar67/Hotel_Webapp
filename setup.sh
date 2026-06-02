@@ -1,114 +1,106 @@
 #!/bin/bash
 # ============================================
-# Hotel Metrodata - WordPress Setup Script
+# Hotel Metrodata - One-Click Setup
 # ============================================
-# Run this on any Ubuntu/Debian/WSL machine
-# Usage: bash setup.sh
+# Run: bash setup.sh
+# Everything is automatic - no prompts, no config
 # ============================================
 
 set -e
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${BLUE}🏨 Hotel Metrodata - Setup${NC}"
-echo "================================="
+echo -e "${BLUE}  Hotel Metrodata  ${NC}"
+echo "=============================="
 
-# 1. Ask for config
-read -p "Domain or IP (default: localhost): " SITE_URL
-SITE_URL=${SITE_URL:-localhost}
+# Configure
+SITE_URL="localhost"
+DB_NAME="hotel_metrodata"
+DB_USER="hotel"
+DB_PASS="hotel123"
 
-read -p "Database name (default: hotel_metrodata): " DB_NAME
-DB_NAME=${DB_NAME:-hotel_metrodata}
+# 1. Install dependencies
+echo -e "\n${GREEN}[1/6] Installing dependencies...${NC}"
+sudo apt-get update -qq
+sudo apt-get install -y -qq nginx php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd php8.5-mbstring php8.5-xml php8.5-zip mariadb-server curl 2>/dev/null || {
+    sudo apt-get install -y -qq nginx php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip mariadb-server curl
+}
 
-read -p "Database user (default: root): " DB_USER
-DB_USER=${DB_USER:-root}
-
-read -sp "Database password: " DB_PASS
-echo ""
-
-read -p "WordPress admin email: " ADMIN_EMAIL
-
-# 2. Install dependencies if needed
-echo -e "\n${GREEN}Checking dependencies...${NC}"
-if ! command -v nginx &> /dev/null; then
-    echo "Installing nginx..."
-    sudo apt-get update && sudo apt-get install -y nginx
-fi
-if ! command -v php &> /dev/null; then
-    echo "Installing PHP..."
-    sudo apt-get install -y php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd php8.5-mbstring php8.5-xml php8.5-zip
-fi
-if ! command -v mysql &> /dev/null; then
-    echo "Installing MariaDB..."
-    sudo apt-get install -y mariadb-server
-    sudo systemctl start mariadb
-fi
+# 2. Start services
+echo -e "${GREEN}[2/6] Starting services...${NC}"
+sudo systemctl start mariadb nginx php8.5-fpm 2>/dev/null || {
+    sudo systemctl start mysql nginx php-fpm
+}
 
 # 3. Create database
-echo -e "\n${GREEN}Setting up database...${NC}"
-sudo mysql -u "$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;" 2>/dev/null || {
-    echo "Trying without password..."
-    sudo mysql -u root -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
-}
-echo "Database $DB_NAME ready"
+echo -e "${GREEN}[3/6] Creating database...${NC}"
+sudo mysql -e "
+    CREATE DATABASE IF NOT EXISTS $DB_NAME;
+    CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+    GRANT ALL ON $DB_NAME.* TO '$DB_USER'@'localhost';
+    FLUSH PRIVILEGES;
+" 2>/dev/null
 
-# 4. Download WordPress if not present
+# 4. Download WordPress core
 if [ ! -f "wp-admin/index.php" ]; then
-    echo -e "\n${GREEN}Downloading WordPress...${NC}"
+    echo -e "${GREEN}[4/6] Downloading WordPress...${NC}"
     curl -sL https://wordpress.org/latest.tar.gz | tar xz --strip-components=1
 fi
 
-# 5. Configure wp-config.php
-echo -e "\n${GREEN}Configuring WordPress...${NC}"
-cp wp-config-sample.php wp-config.php
-sed -i "s/database_name_here/$DB_NAME/" wp-config.php
-sed -i "s/username_here/$DB_USER/" wp-config.php
-sed -i "s/password_here/$DB_PASS/" wp-config.php
-
-# Add salts
-SALTS=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
-sed -i "/AUTH_KEY/d; /SECURE_AUTH_KEY/d; /LOGGED_IN_KEY/d; /NONCE_KEY/d; /AUTH_SALT/d; /SECURE_AUTH_SALT/d; /LOGGED_IN_SALT/d; /NONCE_SALT/d" wp-config.php
-echo "$SALTS" >> wp-config.php
-
-# 6. Import database
-echo -e "\n${GREEN}Importing database...${NC}"
-if [ -f "database/seed.sql.gz" ]; then
-    gunzip -c database/seed.sql.gz | sudo mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" 2>/dev/null || {
-        gunzip -c database/seed.sql.gz | sudo mysql -u root "$DB_NAME"
-    }
-    echo "Database imported"
-fi
-
-# 7. Update site URLs in database
-sudo mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-    UPDATE wp_options SET option_value='http://$SITE_URL' WHERE option_name='siteurl' OR option_name='home';
-    UPDATE wp_posts SET post_content = REPLACE(post_content, 'http://localhost', 'http://$SITE_URL');
-    UPDATE wp_postmeta SET meta_value = REPLACE(meta_value, 'http://localhost', 'http://$SITE_URL');
-    UPDATE wp_options SET option_value=REPLACE(option_value, 'http://localhost', 'http://$SITE_URL') WHERE option_name LIKE '%upload%';
-" 2>/dev/null || {
-    sudo mysql -u root "$DB_NAME" -e "
-        UPDATE wp_options SET option_value='http://$SITE_URL' WHERE option_name='siteurl' OR option_name='home';
-        UPDATE wp_posts SET post_content = REPLACE(post_content, 'http://localhost', 'http://$SITE_URL');
-    "
+# 5. Configure WordPress
+echo -e "${GREEN}[5/6] Configuring WordPress...${NC}"
+cp -f wp-config-sample.php wp-config.php 2>/dev/null || {
+    # Create wp-config if sample doesn't exist
+    cat > wp-config.php << 'WPCONFIG'
+<?php
+define( 'DB_NAME', 'hotel_metrodata' );
+define( 'DB_USER', 'hotel' );
+define( 'DB_PASS', 'hotel123' );
+define( 'DB_HOST', 'localhost' );
+define( 'DB_CHARSET', 'utf8mb4' );
+$table_prefix = 'wp_';
+define( 'WP_DEBUG', false );
+if ( ! defined( 'ABSPATH' ) ) define( 'ABSPATH', __DIR__ . '/' );
+require_once ABSPATH . 'wp-settings.php';
+WPCONFIG
 }
 
-# 8. Set permissions
-echo -e "\n${GREEN}Setting permissions...${NC}"
-sudo chown -R www-data:www-data wp-content/uploads
-sudo chmod -R 755 wp-content
+sed -i "s/database_name_here/$DB_NAME/" wp-config.php 2>/dev/null
+sed -i "s/username_here/$DB_USER/" wp-config.php 2>/dev/null
+sed -i "s/password_here/$DB_PASS/" wp-config.php 2>/dev/null
 
-# 9. Configure nginx
-NGINX_CONF="/etc/nginx/sites-available/hotel"
-sudo tee "$NGINX_CONF" > /dev/null << NGINXEOF
+# Add salts
+if ! grep -q "AUTH_KEY" wp-config.php 2>/dev/null; then
+    curl -s https://api.wordpress.org/secret-key/1.1/salt/ >> wp-config.php
+fi
+
+# 6. Import database
+echo -e "${GREEN}[6/6] Importing database...${NC}"
+if [ -f "database/seed.sql.gz" ]; then
+    gunzip -c database/seed.sql.gz | sudo mysql "$DB_NAME" 2>/dev/null
+    # Update URLs
+    sudo mysql "$DB_NAME" -e "
+        UPDATE wp_options SET option_value='http://$SITE_URL' WHERE option_name IN ('siteurl','home');
+        UPDATE wp_posts SET post_content = REPLACE(post_content, 'http://localhost', 'http://$SITE_URL');
+    " 2>/dev/null
+    echo "  Database imported successfully"
+fi
+
+# 7. Set permissions
+sudo chown -R www-data:www-data wp-content 2>/dev/null
+sudo chmod -R 755 wp-content 2>/dev/null
+
+# 8. Configure nginx
+sudo tee /etc/nginx/sites-available/hotel > /dev/null << NGINXEOF
 server {
     listen 80;
-    server_name $SITE_URL;
+    server_name localhost;
     root $(pwd);
     index index.php index.html;
     client_max_body_size 64M;
-
     location / {
         try_files \$uri \$uri/ /index.php?\$args;
     }
@@ -122,20 +114,16 @@ server {
 }
 NGINXEOF
 
-sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/hotel 2>/dev/null || true
-sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
-sudo systemctl restart nginx php8.5-fpm 2>/dev/null || true
-
-# 10. Create admin account
-sudo mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-    UPDATE wp_users SET user_email='$ADMIN_EMAIL' WHERE ID=1;
-" 2>/dev/null || {
-    sudo mysql -u root "$DB_NAME" -e "UPDATE wp_users SET user_email='$ADMIN_EMAIL' WHERE ID=1;"
+sudo ln -sf /etc/nginx/sites-available/hotel /etc/nginx/sites-enabled/hotel
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo systemctl restart nginx php8.5-fpm 2>/dev/null || {
+    sudo systemctl restart nginx php-fpm
 }
 
-echo -e "\n${GREEN}✅ Setup complete!${NC}"
-echo -e "Site: ${BLUE}http://$SITE_URL${NC}"
-echo -e "Admin: ${BLUE}http://$SITE_URL/wp-admin${NC}"
-echo -e "Login: username 'aus', password 'admin123'"
 echo ""
-echo "Change the admin password after first login!"
+echo -e "${GREEN}  Setup complete!${NC}"
+echo "  Site:    ${BLUE}http://localhost${NC}"
+echo "  Admin:   ${BLUE}http://localhost/wp-admin${NC}"
+echo "  Login:   username: ${BLUE}aus${NC}  password: ${BLUE}admin123${NC}"
+echo ""
+echo "  Next time: bash start.sh"
