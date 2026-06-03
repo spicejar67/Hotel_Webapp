@@ -42,9 +42,10 @@ sudo apt-get install -y -qq nginx php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd 
 
 # 2. Start services
 echo -e "${GREEN}[2/7] Starting nginx, MariaDB, PHP...${NC}"
+PHP_FPM=$(ls /usr/lib/systemd/system/php*-fpm.service 2>/dev/null | head -1 | xargs basename)
 sudo systemctl start mariadb 2>/dev/null || sudo systemctl start mysql 2>/dev/null || true
 sudo systemctl start nginx 2>/dev/null || true
-sudo systemctl start php8.5-fpm 2>/dev/null || sudo systemctl start php-fpm 2>/dev/null || true
+sudo systemctl start ${PHP_FPM:-php-fpm} 2>/dev/null || true
 
 # 3. Create database
 echo -e "${GREEN}[3/7] Creating database...${NC}"
@@ -135,6 +136,7 @@ if [ ! -f "wp-content/themes/storefront/style.css" ]; then
     rm /tmp/storefront.zip
 fi
 # Configure nginx (overwrite any existing config)
+PHP_SOCK=$(ls /var/run/php/php*-fpm.sock 2>/dev/null | head -1)
 sudo tee /etc/nginx/sites-available/hotel > /dev/null << NGINXEOF
 server {
     listen 80;
@@ -147,7 +149,7 @@ server {
     }
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
+        fastcgi_pass unix:${PHP_SOCK:-/var/run/php/php-fpm.sock};
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
@@ -159,8 +161,7 @@ sudo ln -sf /etc/nginx/sites-available/hotel /etc/nginx/sites-enabled/hotel
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Restart everything
-sudo systemctl restart nginx 2>/dev/null || true
-sudo systemctl restart php8.5-fpm 2>/dev/null || sudo systemctl restart php-fpm 2>/dev/null || true
+sudo systemctl restart nginx ${PHP_FPM:-php-fpm} 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}  Setup complete!${NC}"
