@@ -77,6 +77,7 @@ fi
 
 # 5. Download required plugins and theme
 echo -e "${GREEN}[5/7] Downloading plugins and theme...${NC}"
+chown -R $(whoami) "$SCRIPT_DIR/wp-content/plugins" "$SCRIPT_DIR/wp-content/themes" 2>/dev/null || true
 for plugin in woocommerce wp-mail-smtp; do
     if [ ! -d "$SCRIPT_DIR/wp-content/plugins/$plugin" ]; then
         curl -sL "https://downloads.wordpress.org/plugin/$plugin.latest-stable.zip" -o "/tmp/$plugin.zip"
