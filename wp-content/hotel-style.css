@@ -66,7 +66,7 @@
 /* Background image */
 
 /* Background image */
-body { background-image: url('http://localhost/wp-content/themes/storefront/assets/images/background.png'); background-size: cover; background-attachment: fixed; background-position: center; background-repeat: no-repeat; }
+body { background-color: #f4f0fa; }
 
 /* Pastel Purple Header & Footer */
 .site-header, .storefront-primary-navigation, .main-navigation ul.menu ul.sub-menu, .main-navigation ul.nav-menu ul.children {
@@ -206,3 +206,4 @@ body:not(.page-template-template-fullwidth) #primary{width:100%}
 .page-item-59,.menu-item-59{display:none!important}
 .page-item-51,.menu-item-51{display:none!important}
 li.admin-panel-link{display:none!important}
+.woocommerce ul.products li.product img { object-fit: cover !important; height: 300px !important; width: 100% !important; }

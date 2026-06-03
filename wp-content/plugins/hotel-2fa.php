@@ -88,5 +88,5 @@ add_action("init", function() {
  * @action wp_head
  */
 add_action("wp_head", function() {
-    if (is_account_page()) echo "<style>.woocommerce-form-register{display:none!important}</style>";
+    if (function_exists('is_account_page') && is_account_page()) echo "<style>.woocommerce-form-register{display:none!important}</style>";
 });

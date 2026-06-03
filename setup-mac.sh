@@ -81,6 +81,8 @@ if [ -f "$SCRIPT_DIR/database/seed.sql.gz" ]; then
     gunzip -c "$SCRIPT_DIR/database/seed.sql.gz" | mysql -u root "$DB_NAME" 2>/dev/null
     mysql -u root "$DB_NAME" -e "
         UPDATE wp_options SET option_value='http://$SITE_URL' WHERE option_name IN ('siteurl','home');
+        UPDATE wp_posts SET post_content = REPLACE(post_content, 'localhost:8080', '$SITE_URL');
+        UPDATE wp_postmeta SET meta_value = REPLACE(meta_value, 'localhost:8080', '$SITE_URL');
     " 2>/dev/null
 fi
 

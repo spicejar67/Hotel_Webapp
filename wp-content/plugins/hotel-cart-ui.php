@@ -77,7 +77,7 @@ add_action("woocommerce_before_customer_login_form", function() {
  * @action template_redirect
  */
 add_action("template_redirect", function() {
-    if (is_checkout() && !is_user_logged_in()) {
+    if (function_exists('is_checkout') && is_checkout() && !is_user_logged_in()) {
         wc_add_notice("Please log in or create an account to checkout.", "notice");
         wp_safe_redirect(wc_get_page_permalink("myaccount"));
         exit;
@@ -106,7 +106,7 @@ add_action("woocommerce_before_cart", function() {
  * @action wp_enqueue_scripts
  */
 add_action("wp_enqueue_scripts", function() {
-    if (is_cart() || is_checkout()) {
+    if ((function_exists('is_cart') && is_cart()) || (function_exists('is_checkout') && is_checkout())) {
         wp_enqueue_style("hotel-cart-ui", "/wp-content/hotel-cart-ui.css", [], "1.0");
     }
 });
