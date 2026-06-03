@@ -160,6 +160,16 @@ NGINXEOF
 sudo ln -sf /etc/nginx/sites-available/hotel /etc/nginx/sites-enabled/hotel
 sudo rm -f /etc/nginx/sites-enabled/default
 
+# Also redirect 8080 to 80 (fixes cached browser redirects)
+sudo tee /etc/nginx/sites-available/hotel-8080 > /dev/null << NGINXEOF2
+server {
+    listen 8080;
+    server_name localhost;
+    return 302 http://localhost\$request_uri;
+}
+NGINXEOF2
+sudo ln -sf /etc/nginx/sites-available/hotel-8080 /etc/nginx/sites-enabled/
+
 # Restart everything
 sudo systemctl restart nginx ${PHP_FPM:-php-fpm} 2>/dev/null || true
 
