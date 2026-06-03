@@ -42,7 +42,7 @@ add_filter("wp_list_pages_excludes", function($exclude) {
  */
 remove_action("storefront_header", "storefront_header_cart", 60);
 add_action("storefront_header", function() {
-    if (function_exists("WC") && WC()) { if (function_exists("WC") && WC()) {
+    if (function_exists("WC") && WC()) {
         $count = WC()->cart->get_cart_contents_count();
         $total = WC()->cart->get_cart_total();
     } else {
