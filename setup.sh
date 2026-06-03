@@ -107,11 +107,16 @@ if [ -f "database/seed.sql.gz" ]; then
     " 2>/dev/null
 fi
 
-# Set permissions
-sudo chown -R www-data:www-data wp-content 2>/dev/null || true
+# Set permissions for nginx
+sudo chown -R www-data:www-data . 2>/dev/null || true
 sudo chmod -R 755 wp-content 2>/dev/null || true
+# Ensure current user can still write to plugins/themes
+sudo chown -R $USER:$USER wp-content/plugins wp-content/themes wp-content/uploads 2>/dev/null || true
 
 echo -e "${GREEN}[6/7] Downloading plugins and theme...${NC}"
+# Ensure we can write to plugin/theme dirs
+sudo chown -R $USER:$USER wp-content/plugins wp-content/themes 2>/dev/null || true
+
 # Download required plugins if missing
 for plugin in woocommerce wp-mail-smtp; do
     if [ ! -d "wp-content/plugins/$plugin" ]; then
