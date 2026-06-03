@@ -75,8 +75,23 @@ if ! grep -q "AUTH_KEY" "$SCRIPT_DIR/wp-config.php" 2>/dev/null; then
     curl -s https://api.wordpress.org/secret-key/1.1/salt/ >> "$SCRIPT_DIR/wp-config.php"
 fi
 
-# 5. Import database
-echo -e "${GREEN}[5/6] Importing database...${NC}"
+# 5. Download required plugins and theme
+echo -e "${GREEN}[5/7] Downloading plugins and theme...${NC}"
+for plugin in woocommerce wp-mail-smtp; do
+    if [ ! -d "$SCRIPT_DIR/wp-content/plugins/$plugin" ]; then
+        curl -sL "https://downloads.wordpress.org/plugin/$plugin.latest-stable.zip" -o "/tmp/$plugin.zip"
+        unzip -oq "/tmp/$plugin.zip" -d "$SCRIPT_DIR/wp-content/plugins/"
+        rm "/tmp/$plugin.zip"
+    fi
+done
+if [ ! -f "$SCRIPT_DIR/wp-content/themes/storefront/style.css" ]; then
+    curl -sL https://downloads.wordpress.org/theme/storefront.latest-stable.zip -o /tmp/storefront.zip
+    unzip -oq /tmp/storefront.zip -d "$SCRIPT_DIR/wp-content/themes/"
+    rm /tmp/storefront.zip
+fi
+
+# 6. Import database
+echo -e "${GREEN}[6/7] Importing database...${NC}"
 if [ -f "$SCRIPT_DIR/database/seed.sql.gz" ]; then
     gunzip -c "$SCRIPT_DIR/database/seed.sql.gz" | mysql -u root "$DB_NAME" 2>/dev/null
     mysql -u root "$DB_NAME" -e "
@@ -86,15 +101,8 @@ if [ -f "$SCRIPT_DIR/database/seed.sql.gz" ]; then
     " 2>/dev/null
 fi
 
-# Download Storefront theme if missing
-if [ ! -f "$SCRIPT_DIR/wp-content/themes/storefront/style.css" ]; then
-    echo -e "${GREEN}Downloading Storefront theme...${NC}"
-    curl -sL https://downloads.wordpress.org/theme/storefront.latest-stable.zip -o /tmp/storefront.zip
-    unzip -oq /tmp/storefront.zip -d "$SCRIPT_DIR/wp-content/themes/"
-    rm /tmp/storefront.zip
-fi
-# 6. Configure nginx
-echo -e "${GREEN}[6/6] Configuring nginx...${NC}"
+# 7. Configure nginx
+echo -e "${GREEN}[7/7] Configuring nginx...${NC}"
 NGINX_CONF=$(brew --prefix)/etc/nginx/servers/hotel.conf
 mkdir -p "$(dirname "$NGINX_CONF")"
 

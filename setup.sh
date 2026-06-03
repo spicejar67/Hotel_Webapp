@@ -33,7 +33,7 @@ DB_USER="hotel"
 DB_PASS="hotel123"
 
 # 1. Install dependencies
-echo -e "\n${GREEN}[1/6] Installing system packages...${NC}"
+echo -e "\n${GREEN}[1/7] Installing system packages...${NC}"
 sudo apt-get update -qq 2>/dev/null
 sudo apt-get install -y -qq nginx php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd php8.5-mbstring php8.5-xml php8.5-zip mariadb-server curl 2>/dev/null || {
     # Fallback for non-Ubuntu or different PHP version
@@ -41,13 +41,13 @@ sudo apt-get install -y -qq nginx php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd 
 }
 
 # 2. Start services
-echo -e "${GREEN}[2/6] Starting nginx, MariaDB, PHP...${NC}"
+echo -e "${GREEN}[2/7] Starting nginx, MariaDB, PHP...${NC}"
 sudo systemctl start mariadb 2>/dev/null || sudo systemctl start mysql 2>/dev/null || true
 sudo systemctl start nginx 2>/dev/null || true
 sudo systemctl start php8.5-fpm 2>/dev/null || sudo systemctl start php-fpm 2>/dev/null || true
 
 # 3. Create database
-echo -e "${GREEN}[3/6] Creating database...${NC}"
+echo -e "${GREEN}[3/7] Creating database...${NC}"
 sudo mysql -e "
     CREATE DATABASE IF NOT EXISTS $DB_NAME;
     CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
@@ -65,12 +65,12 @@ sudo mysql -e "
 
 # 4. Download WordPress core
 if [ ! -f "wp-admin/index.php" ]; then
-    echo -e "${GREEN}[4/6] Downloading WordPress...${NC}"
+    echo -e "${GREEN}[4/7] Downloading WordPress...${NC}"
     curl -sL https://wordpress.org/latest.tar.gz | tar xz --strip-components=1
 fi
 
 # 5. Configure WordPress
-echo -e "${GREEN}[5/6] Configuring wp-config.php...${NC}"
+echo -e "${GREEN}[5/7] Configuring wp-config.php...${NC}"
 if [ -f "wp-config-sample.php" ]; then
     cp -f wp-config-sample.php wp-config.php
     sed -i "s/database_name_here/$DB_NAME/" wp-config.php
@@ -97,7 +97,7 @@ if ! grep -q "AUTH_KEY" wp-config.php 2>/dev/null; then
 fi
 
 # 6. Import database
-echo -e "${GREEN}[6/6] Importing database...${NC}"
+echo -e "${GREEN}[7/7] Importing database...${NC}"
 if [ -f "database/seed.sql.gz" ]; then
     gunzip -c database/seed.sql.gz | sudo mysql "$DB_NAME" 2>/dev/null
     sudo mysql "$DB_NAME" -e "
@@ -110,6 +110,17 @@ fi
 # Set permissions
 sudo chown -R www-data:www-data wp-content 2>/dev/null || true
 sudo chmod -R 755 wp-content 2>/dev/null || true
+
+echo -e "${GREEN}[6/7] Downloading plugins and theme...${NC}"
+# Download required plugins if missing
+for plugin in woocommerce wp-mail-smtp; do
+    if [ ! -d "wp-content/plugins/$plugin" ]; then
+        echo -e "${GREEN}Downloading $plugin...${NC}"
+        curl -sL "https://downloads.wordpress.org/plugin/$plugin.latest-stable.zip" -o "/tmp/$plugin.zip"
+        unzip -oq "/tmp/$plugin.zip" -d wp-content/plugins/
+        rm "/tmp/$plugin.zip"
+    fi
+done
 
 # Download Storefront theme if missing
 if [ ! -f "wp-content/themes/storefront/style.css" ]; then
