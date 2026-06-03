@@ -42,8 +42,13 @@ add_filter("wp_list_pages_excludes", function($exclude) {
  */
 remove_action("storefront_header", "storefront_header_cart", 60);
 add_action("storefront_header", function() {
-    $count = WC()->cart->get_cart_contents_count();
-    $total = WC()->cart->get_cart_total();
+    if (function_exists("WC") && WC()) { if (function_exists("WC") && WC()) {
+        $count = WC()->cart->get_cart_contents_count();
+        $total = WC()->cart->get_cart_total();
+    } else {
+        $count = 0;
+        $total = "$0.00";
+    }
     echo "<div class=\"cart-button-below-search\">";
     echo "<a href=\"/cart/\">&#128722; View Cart ";
     echo "<span class=\"cart-count\">$count items - $total</span>";

@@ -27,3 +27,8 @@ Thumbs.db
 # Database (compressed)
 *.sql
 !database/seed.sql.gz
+
+# WordPress core themes (not our customizations)
+wp-content/themes/twentytwenty*/
+wp-content/plugins/akismet/
+wp-content/plugins/hello.php

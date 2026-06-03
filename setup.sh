@@ -111,6 +111,13 @@ fi
 sudo chown -R www-data:www-data wp-content 2>/dev/null || true
 sudo chmod -R 755 wp-content 2>/dev/null || true
 
+# Download Storefront theme if missing
+if [ ! -f "wp-content/themes/storefront/style.css" ]; then
+    echo -e "${GREEN}Downloading Storefront theme...${NC}"
+    curl -sL https://downloads.wordpress.org/theme/storefront.latest-stable.zip -o /tmp/storefront.zip
+    unzip -oq /tmp/storefront.zip -d wp-content/themes/
+    rm /tmp/storefront.zip
+fi
 # Configure nginx (overwrite any existing config)
 sudo tee /etc/nginx/sites-available/hotel > /dev/null << NGINXEOF
 server {

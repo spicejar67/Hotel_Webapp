@@ -86,6 +86,13 @@ if [ -f "$SCRIPT_DIR/database/seed.sql.gz" ]; then
     " 2>/dev/null
 fi
 
+# Download Storefront theme if missing
+if [ ! -f "$SCRIPT_DIR/wp-content/themes/storefront/style.css" ]; then
+    echo -e "${GREEN}Downloading Storefront theme...${NC}"
+    curl -sL https://downloads.wordpress.org/theme/storefront.latest-stable.zip -o /tmp/storefront.zip
+    unzip -oq /tmp/storefront.zip -d "$SCRIPT_DIR/wp-content/themes/"
+    rm /tmp/storefront.zip
+fi
 # 6. Configure nginx
 echo -e "${GREEN}[6/6] Configuring nginx...${NC}"
 NGINX_CONF=$(brew --prefix)/etc/nginx/servers/hotel.conf
