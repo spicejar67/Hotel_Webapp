@@ -1,138 +1,70 @@
-# Hotel Metrodata Database
+# Hotel Metrodata — Database Reference
 
-## Before you start
+**Connection:** `127.0.0.1` | **Database:** `hotel_metrodata` | **User:** `hotel` | **Password:** `hotel123`
 
-You need a terminal. On Linux/Mac: open **Terminal**. On Windows: open **WSL** (search "wsl" in Start).
+---
 
-Every code block below can be copied and pasted directly. Press Enter to run.
+## Quick Access
 
-## 1. Open the database
+| Method | Command | Description |
+|---|---|---|
+| Root access | `sudo mariadb hotel_metrodata` | Full privileges, no password needed via sudo |
+| User access | `mysql -u hotel -photel123 hotel_metrodata` | Connect as the hotel database user |
+| Browser | `http://localhost/wp-admin` → **Hotel Logs** | GUI view of activity logs |
 
-Copy and paste this into your terminal:
+---
 
-```bash
-sudo mariadb hotel_metrodata
-```
+## Core Tables
 
-You should see a prompt like `MariaDB [hotel_metrodata]>`. You're now inside the database. Type commands at this prompt.
+| Table | What it stores | Example query |
+|---|---|---|
+| `wp_posts` | Pages, rooms/products, orders, menus | `SELECT ID, post_title FROM wp_posts WHERE post_type = 'product';` |
+| `wp_postmeta` | Prices, thumbnails, visibility flags | `SELECT post_id, meta_value FROM wp_postmeta WHERE meta_key = '_price';` |
+| `wp_users` | Usernames, emails, hashed passwords | `SELECT ID, user_login, user_email FROM wp_users;` |
+| `wp_usermeta` | Roles, capabilities, last activity | `SELECT user_id, meta_value FROM wp_usermeta WHERE meta_key = 'wp_capabilities';` |
+| `wp_options` | Site URL, theme, active plugins, WC settings | `SELECT option_name, option_value FROM wp_options WHERE option_name IN ('siteurl','home');` |
+| `wp_comments` | Product reviews and ratings | `SELECT comment_ID, comment_content FROM wp_comments WHERE comment_post_ID = 20;` |
+| `wp_signup_codes` | 2FA verification codes (hotel custom) | `SELECT * FROM wp_signup_codes WHERE verified = 0;` |
 
-When you're done, type `exit` and press Enter.
+---
 
-## 2. Connection details
+## Common Tasks
 
-| Field | Value |
+| Task | Command (copy-paste ready) |
 |---|---|
-| Host | `127.0.0.1` |
-| Database | `hotel_metrodata` |
-| User | `hotel` |
-| Password | `hotel123` |
+| Show all rooms | `SELECT ID, post_title FROM wp_posts WHERE post_type = 'product';` |
+| Show rooms with prices | `SELECT p.ID, p.post_title, pm.meta_value AS price FROM wp_posts p JOIN wp_postmeta pm ON p.ID = pm.post_id WHERE p.post_type = 'product' AND pm.meta_key = '_price';` |
+| Count rooms | `SELECT COUNT(*) FROM wp_posts WHERE post_type = 'product';` |
+| Show all users | `SELECT ID, user_login, user_email FROM wp_users;` |
+| Find user by email | `SELECT * FROM wp_users WHERE user_email = 'example@gmail.com';` |
+| Reset admin password | `UPDATE wp_users SET user_pass = MD5('newpassword') WHERE ID = 1;` |
+| Check site URL | `SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');` |
+| Fix redirect to wrong port | `UPDATE wp_options SET option_value = 'http://localhost' WHERE option_name IN ('siteurl', 'home');` |
+| See active plugins | `SELECT option_value FROM wp_options WHERE option_name = 'active_plugins';` |
+| Show all orders | `SELECT ID, post_title, post_status FROM wp_posts WHERE post_type = 'shop_order';` |
+| Count total orders | `SELECT COUNT(*) FROM wp_posts WHERE post_type = 'shop_order';` |
+| View pending 2FA codes | `SELECT * FROM wp_signup_codes WHERE verified = 0 AND expires_at > UTC_TIMESTAMP();` |
+| Clean expired 2FA codes | `DELETE FROM wp_signup_codes WHERE expires_at < UTC_TIMESTAMP();` |
+| Block a user (replace 3 with ID) | `UPDATE wp_usermeta SET meta_value = 'a:1:{s:7:"blocked";b:1;}' WHERE user_id = 3 AND meta_key = 'wp_capabilities';` |
 
-If you need to connect with a specific user instead of sudo:
+---
 
-```bash
-mysql -u hotel -photel123 hotel_metrodata
-```
+## Readable Output
 
-## 3. What's stored where
-
-| Table | What's inside it |
+| Tip | How |
 |---|---|
-| `wp_posts` | Pages, rooms/products, orders, menus — almost everything |
-| `wp_postmeta` | Extra data like prices (`_price`), thumbnail image IDs |
-| `wp_users` | Usernames, emails, passwords (hashed, not readable) |
-| `wp_usermeta` | User roles, capabilities, last activity time |
-| `wp_options` | Site URL, theme, active plugins, all WooCommerce settings |
-| `wp_comments` | Product reviews and ratings |
+| Output is too wide | Add `\G` instead of `;` at the end — flips rows vertical |
+| Count only | `SELECT COUNT(*) FROM wp_posts;` |
+| Output to file | `SELECT * FROM wp_users INTO OUTFILE '/tmp/users.txt';` |
+| Pipe to pager | `sudo mariadb hotel_metrodata -e "SELECT * FROM wp_users;" \| less` |
 
-## 4. Common tasks (copy and paste exactly)
+---
 
-### Show all users
+## Backup & Restore
 
-```
-SELECT ID, user_login, user_email FROM wp_users;
-```
-
-### Find a user by email
-
-```
-SELECT * FROM wp_users WHERE user_email = 'example@gmail.com';
-```
-
-### Show all rooms and their prices
-
-```
-SELECT p.ID, p.post_title, pm.meta_value AS price
-FROM wp_posts p
-JOIN wp_postmeta pm ON p.ID = pm.post_id
-WHERE p.post_type = 'product' AND pm.meta_key = '_price';
-```
-
-### Reset the admin password (replace newpass123 with your new password)
-
-```
-UPDATE wp_users SET user_pass = MD5('newpass123') WHERE ID = 1;
-```
-
-### Check site URL (fixes redirect issues)
-
-```
-SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
-```
-
-### Change site URL (if site keeps redirecting wrong)
-
-```
-UPDATE wp_options SET option_value = 'http://localhost' WHERE option_name IN ('siteurl', 'home');
-```
-
-### See which plugins are active
-
-```
-SELECT option_value FROM wp_options WHERE option_name = 'active_plugins';
-```
-
-### Count total rooms
-
-```
-SELECT COUNT(*) FROM wp_posts WHERE post_type = 'product';
-```
-
-### Count total users
-
-```
-SELECT COUNT(*) FROM wp_users;
-```
-
-### Show all orders
-
-```
-SELECT ID, post_title, post_status FROM wp_posts WHERE post_type = 'shop_order';
-```
-
-### If the output is too wide to read
-
-Add `\G` at the end instead of `;` — it flips everything vertical:
-
-```
-SELECT * FROM wp_users \G
-```
-
-## 5. Backup and restore
-
-### Create a backup (copy and paste)
-
-```bash
-sudo mysqldump hotel_metrodata | gzip > ~/hotel_backup.sql.gz
-```
-
-This saves a file called `hotel_backup.sql.gz` in your home directory.
-
-### Restore from backup (copy and paste)
-
-```bash
-gunzip -c ~/hotel_backup.sql.gz | sudo mariadb hotel_metrodata
-```
-
-## 6. Exit the database
-
-Type `exit` and press Enter. Or press `Ctrl+C`.
+| Task | Command |
+|---|---|
+| Backup database | `sudo mysqldump hotel_metrodata \| gzip > ~/hotel_backup.sql.gz` |
+| Restore database | `gunzip -c ~/hotel_backup.sql.gz \| sudo mariadb hotel_metrodata` |
+| Backup files + DB | `sudo tar -czf ~/full_backup.tar.gz /var/www/hotel-metrodata` |
+| Restore everything | `sudo tar -xzf ~/full_backup.tar.gz -C / && sudo systemctl restart php8.5-fpm nginx mariadb` |
