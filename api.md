@@ -2,65 +2,68 @@
 
 Base URL: `http://localhost/wp-json/hotel/v1`
 
-## Endpoints
+## Rooms
 
-### Rooms
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/rooms` | List all rooms |
+| GET | `/rooms/20` | Single room by ID |
+| GET | `/rooms/search?q=luxury` | Search rooms |
+| GET | `/rooms/20/reviews` | Room reviews |
+| POST | `/rooms/20/reviews` | Submit review (login required) |
 
-**GET /rooms** — List all rooms
-```
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq .
-```
-Returns: `{total, rooms: [{id, name, price, image, rating, url}]}`
+## Cart
 
-**GET /rooms/{id}** — Single room
-```
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms/20 | jq .
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/cart` | View cart |
+| POST | `/cart/add` | Add to cart `product_id=20&quantity=1` |
+| POST | `/cart/remove` | Remove item `key=abc123` |
+| POST | `/cart/update` | Change quantity `key=abc123&quantity=3` |
+| POST | `/cart/clear` | Empty cart |
 
-**GET /rooms/search?q=** — Search rooms
-```
-curl --noproxy localhost "http://localhost/wp-json/hotel/v1/rooms/search?q=luxury" | jq .
-```
+## Auth
 
-### Cart
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/login` | Login `username=aus&password=...` |
+| POST | `/auth/register` | Register `email=...&password=...` |
+| POST | `/auth/logout` | Logout |
+| GET | `/auth/me` | Current user info |
 
-**GET /cart** — View cart
-```
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/cart | jq .
-```
+## Checkout
 
-**POST /cart/add** — Add to cart
-```
-curl --noproxy localhost -X POST -d "product_id=20&quantity=1" http://localhost/wp-json/hotel/v1/cart/add | jq .
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/checkout` | Place order (login required) |
 
-### Auth
+## Admin (aus only)
 
-**GET /auth/me** — Current user (login required)
-```
-curl --noproxy localhost -u "aus:PASSWORD" http://localhost/wp-json/hotel/v1/auth/me | jq .
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/admin/users` | All users |
+| GET | `/admin/orders` | All orders |
+| GET | `/admin/stats` | Site stats |
+| POST | `/admin/users/3/block` | Block/unblock `block=1` or `block=0` |
+| POST | `/admin/rooms` | Create room `name=...&price=...&description=...` |
+| PUT | `/admin/rooms/20` | Update room `name=...&price=...` |
+| DELETE | `/admin/rooms/20` | Delete room |
 
-### Admin (aus only)
-
-**GET /admin/users** — All users
-**GET /admin/stats** — Site stats
-
-## Authentication
-
-- **Browser:** Login normally, API works via session cookie
-- **CLI/Scripts:** Use Basic Auth: `-u "aus:API_KEY"`
-- **Generate API keys:** `/hotel-admin/` → API Keys tab
-
-## Filtering with jq
+## Examples
 
 ```bash
-# List room names and prices only
-curl -s --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq '.rooms[] | {name, price}'
+# Create a room
+curl --noproxy localhost -u "aus:KEY" -X POST -d "name=VIP Suite&price=599&short_description=Luxury suite" http://localhost/wp-json/hotel/v1/admin/rooms | jq .
 
-# Count rooms
-curl -s --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq '.total'
+# Update room price
+curl --noproxy localhost -u "aus:KEY" -X PUT -d "price=699" http://localhost/wp-json/hotel/v1/admin/rooms/20 | jq .
 
-# Filter rooms above $300
-curl -s --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq '.rooms[] | select(.price > 300)'
+# Delete a room
+curl --noproxy localhost -u "aus:KEY" -X DELETE http://localhost/wp-json/hotel/v1/admin/rooms/99 | jq .
+
+# Register new user
+curl --noproxy localhost -X POST -d "email=guest@example.com&password=secure123" http://localhost/wp-json/hotel/v1/auth/register | jq .
+
+# Login
+curl --noproxy localhost -X POST -d "username=aus&password=admin123" http://localhost/wp-json/hotel/v1/auth/login | jq .
 ```
