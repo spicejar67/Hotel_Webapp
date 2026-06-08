@@ -1,6 +1,6 @@
 # Hotel Metrodata — Keycloak Reference
 
-**URL:** `http://localhost:8080` | **Admin:** `admin/admin` | **Realm:** `hotel`
+**URL:** `http://localhost:8080` | **Realm:** `hotel` | **Admin password:** Set during first login (not stored here)
 
 ---
 
