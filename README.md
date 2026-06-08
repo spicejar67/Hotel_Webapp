@@ -58,6 +58,17 @@ brew services stop nginx mariadb php     # Stop
 - Star rating system for rooms
 - Admin panel: manage users, edit prices, add/delete rooms with images
 - Secret Tetris game (link in footer)
+- Optional: Keycloak SSO (single sign-on)
+
+## Keycloak SSO (Optional)
+
+Add enterprise single sign-on with Keycloak:
+
+```bash
+bash setup-keycloak.sh
+```
+
+This installs Java, downloads Keycloak, and starts it on port 8080. Users log in through Keycloak instead of WordPress. The site works fine without it — this is for learning or enterprise environments. See `keycloak.md` for configuration details.
 
 ## Admin Account
 
