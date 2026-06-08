@@ -1,181 +1,105 @@
-# Hotel Metrodata REST API
+# Hotel Metrodata — REST API Reference
 
-## Before you start
+**Base URL:** `http://localhost/wp-json/hotel/v1`
 
-You need a terminal. On Linux/Mac: open **Terminal**. On Windows: open **WSL** (search "wsl" in Start). Every code block below can be copied and pasted directly into your terminal. Press Enter to run.
+> All responses are JSON. Use `| jq .` to format output. Write endpoints require auth. Report bugs in GitHub Issues.
 
-## Try it in the browser first (no terminal needed)
+---
 
-1. Open your browser and go to `http://localhost/wp-json/`
-2. Install the **JSON Formatter** browser extension (Chrome Web Store or Firefox Add-ons)
-3. Now click any link — the data appears formatted and readable
+## Rooms
 
-## Try it from the terminal
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `GET` | `/rooms` | List all rooms with prices and images | `curl -s --noproxy localhost /wp-json/hotel/v1/rooms \| jq '.rooms[] \| {name, price}'` |
+| `GET` | `/rooms/(id)` | Get a single room by its ID | `curl -s --noproxy localhost /wp-json/hotel/v1/rooms/20 \| jq .` |
+| `GET` | `/rooms/search?q=` | Search rooms by keyword (name, description) | `curl -s --noproxy localhost "/wp-json/hotel/v1/rooms/search?q=luxury" \| jq .` |
+| `GET` | `/rooms/(id)/reviews` | Get reviews for a room | `curl -s --noproxy localhost /wp-json/hotel/v1/rooms/20/reviews \| jq .` |
+| `POST` | `/rooms/(id)/reviews` | Submit a review (login required) | `curl -s --noproxy localhost -u "aus:KEY" -X POST -d "text=Amazing views!&rating=5" /wp-json/hotel/v1/rooms/20/reviews \| jq .` |
 
-### 1. Check it works — list all rooms
+---
 
-Copy and paste this into your terminal, then press Enter:
+## Admin — Room CRUD (aus only)
 
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms
-```
+All admin endpoints require authentication. Add `-u "aus:API_KEY"` to every command.
 
-You should see a big block of text. That's JSON — it's the list of all rooms.
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `POST` | `/admin/rooms` | Create a new room listing | `curl -s --noproxy localhost -u "aus:KEY" -X POST -d "name=Ocean View&price=349&description=Beachfront room" /wp-json/hotel/v1/admin/rooms \| jq .` |
+| `PUT` | `/admin/rooms/(id)` | Update room name, price, or description | `curl -s --noproxy localhost -u "aus:KEY" -X PUT -d "price=399" /wp-json/hotel/v1/admin/rooms/20 \| jq .` |
+| `DELETE` | `/admin/rooms/(id)` | Delete a room permanently | `curl -s --noproxy localhost -u "aus:KEY" -X DELETE /wp-json/hotel/v1/admin/rooms/99 \| jq .` |
 
-### 2. Make it readable — install jq
+---
 
-`jq` is a tool that formats JSON so humans can read it. Copy and paste this once:
+## Admin — Users (aus only)
 
-```bash
-sudo apt-get install -y jq
-```
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `GET` | `/admin/users` | List all registered users | `curl -s --noproxy localhost -u "aus:KEY" /wp-json/hotel/v1/admin/users \| jq '.[] \| {login, email, roles}'` |
+| `POST` | `/admin/users/(id)/block` | Block or unblock a user | Block: `-d "block=1"` — Unblock: `-d "block=0"` |
 
-Now try the rooms command again, but pipe it through jq:
+---
 
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq .
-```
+## Admin — Orders (aus only)
 
-Much better, right? From now on, add `| jq .` to the end of any command to make it readable.
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `GET` | `/admin/orders` | List all orders | `curl -s --noproxy localhost -u "aus:KEY" /wp-json/hotel/v1/admin/orders \| jq '.[] \| {id, status, total}'` |
 
-## All endpoints (copy-paste ready)
+---
 
-### Rooms
+## Admin — Stats (aus only)
 
-**List all rooms:**
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms | jq .
-```
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `GET` | `/admin/stats` | Site overview: total users, rooms, orders | `curl -s --noproxy localhost -u "aus:KEY" /wp-json/hotel/v1/admin/stats \| jq .` |
 
-**View one room (replace 20 with any room ID):**
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms/20 | jq .
-```
+---
 
-**Search rooms by keyword:**
-```bash
-curl --noproxy localhost "http://localhost/wp-json/hotel/v1/rooms/search?q=luxury" | jq .
-```
+## Cart
 
-**See reviews for a room:**
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/rooms/20/reviews | jq .
-```
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `GET` | `/cart` | View current cart contents | `curl -s --noproxy localhost /wp-json/hotel/v1/cart \| jq .` |
+| `POST` | `/cart/add` | Add a room to the cart | `curl -s --noproxy localhost -X POST -d "product_id=20&quantity=1" /wp-json/hotel/v1/cart/add \| jq .` |
+| `POST` | `/cart/remove` | Remove an item by its key | `curl -s --noproxy localhost -X POST -d "key=abc123" /wp-json/hotel/v1/cart/remove \| jq .` |
+| `POST` | `/cart/update` | Change quantity of an item | `curl -s --noproxy localhost -X POST -d "key=abc123&quantity=3" /wp-json/hotel/v1/cart/update \| jq .` |
+| `POST` | `/cart/clear` | Empty the entire cart | `curl -s --noproxy localhost -X POST /wp-json/hotel/v1/cart/clear \| jq .` |
 
-**Submit a review (you must be logged in first — see Auth section):**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X POST -d "text=Amazing room!&rating=5" http://localhost/wp-json/hotel/v1/rooms/20/reviews | jq .
-```
+---
 
-### Cart
+## Auth
 
-**View cart:**
-```bash
-curl --noproxy localhost http://localhost/wp-json/hotel/v1/cart | jq .
-```
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `POST` | `/auth/login` | Log in with username and password | `curl -s --noproxy localhost -X POST -d "username=aus&password=admin123" /wp-json/hotel/v1/auth/login \| jq .` |
+| `POST` | `/auth/register` | Create a new account | `curl -s --noproxy localhost -X POST -d "email=newuser@gmail.com&password=mypassword123" /wp-json/hotel/v1/auth/register \| jq .` |
+| `POST` | `/auth/logout` | End current session | `curl -s --noproxy localhost -X POST /wp-json/hotel/v1/auth/logout \| jq .` |
+| `GET` | `/auth/me` | Get currently logged-in user info | `curl -s --noproxy localhost -u "aus:KEY" /wp-json/hotel/v1/auth/me \| jq .` |
 
-**Add item to cart (replace 20 with room ID):**
-```bash
-curl --noproxy localhost -X POST -d "product_id=20&quantity=1" http://localhost/wp-json/hotel/v1/cart/add | jq .
-```
+---
 
-**Remove item from cart (replace abc123 with the item key from View cart):**
-```bash
-curl --noproxy localhost -X POST -d "key=abc123" http://localhost/wp-json/hotel/v1/cart/remove | jq .
-```
+## Checkout
 
-**Change quantity of an item:**
-```bash
-curl --noproxy localhost -X POST -d "key=abc123&quantity=3" http://localhost/wp-json/hotel/v1/cart/update | jq .
-```
+| Methods | Endpoint | Description | Example |
+|---|---|---|---|
+| `POST` | `/checkout` | Place an order from cart (login required) | `curl -s --noproxy localhost -u "aus:KEY" -X POST /wp-json/hotel/v1/checkout \| jq .` |
 
-**Empty cart:**
-```bash
-curl --noproxy localhost -X POST http://localhost/wp-json/hotel/v1/cart/clear | jq .
-```
+---
 
-### Auth (login, register, logout)
+## Authentication
 
-**Login:**
-```bash
-curl --noproxy localhost -X POST -d "username=aus&password=admin123" http://localhost/wp-json/hotel/v1/auth/login | jq .
-```
+All endpoints marked "aus only" or "login required" need authentication. Pick one:
 
-**Register a new account:**
-```bash
-curl --noproxy localhost -X POST -d "email=newuser@gmail.com&password=mypassword123" http://localhost/wp-json/hotel/v1/auth/register | jq .
-```
+| Method | When to use | How |
+|---|---|---|
+| **Browser session** | You're logged into the site in your browser | API Explorer at `/hotel-api-explorer/` works automatically |
+| **API Key** (apps, scripts, curl) | You're writing a script or external app | Generate at `/hotel-admin/` → API Keys tab. Add `-u "aus:KEY"` to curl |
 
-**See your current user info (requires API key or login):**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" http://localhost/wp-json/hotel/v1/auth/me | jq .
-```
+---
 
-**Logout:**
-```bash
-curl --noproxy localhost -X POST http://localhost/wp-json/hotel/v1/auth/logout | jq .
-```
+## Rate Limits & Security
 
-### Checkout (place an order)
-
-First add items to cart, then:
-
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X POST http://localhost/wp-json/hotel/v1/checkout | jq .
-```
-
-### Admin (aus only — requires API key)
-
-**How to get an API key:**
-1. Go to `http://localhost/hotel-admin/` → **API Keys** tab
-2. Type a name like "My Script" → click **Generate**
-3. Copy the long code that appears — that's your API key
-4. Use it in commands below by replacing `YOUR_API_KEY` with it
-
-**List all users:**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" http://localhost/wp-json/hotel/v1/admin/users | jq .
-```
-
-**List all orders:**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" http://localhost/wp-json/hotel/v1/admin/orders | jq .
-```
-
-**Site stats:**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" http://localhost/wp-json/hotel/v1/admin/stats | jq .
-```
-
-**Block a user (replace 3 with user ID):**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X POST -d "block=1" http://localhost/wp-json/hotel/v1/admin/users/3/block | jq .
-```
-
-**Unblock a user:**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X POST -d "block=0" http://localhost/wp-json/hotel/v1/admin/users/3/block | jq .
-```
-
-**Create a room:**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X POST -d "name=VIP Suite&price=599&short_description=Luxury room with view" http://localhost/wp-json/hotel/v1/admin/rooms | jq .
-```
-
-**Update room price (replace 20 with room ID):**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X PUT -d "price=699" http://localhost/wp-json/hotel/v1/admin/rooms/20 | jq .
-```
-
-**Delete a room (replace 99 with room ID):**
-```bash
-curl --noproxy localhost -u "aus:YOUR_API_KEY" -X DELETE http://localhost/wp-json/hotel/v1/admin/rooms/99 | jq .
-```
-
-## No terminal? Use the API Explorer
-
-1. Go to `http://localhost/hotel-api-explorer/` (must be logged in as aus)
-2. Pick an endpoint from the dropdown
-3. Type a parameter if needed (like a room ID or search term)
-4. Click **Send Request**
-5. Results appear formatted — no terminal, no commands
+- 100 requests per minute per IP address
+- 5 failed login attempts = 15-minute block
+- All input sanitized — HTML/scripts stripped
+- Suspicious requests logged to PHP error log
